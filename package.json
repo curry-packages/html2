@@ -1,0 +1,31 @@
+{
+    "name": "html2",
+    "version": "0.0.1",
+    "author": "Michael Hanus <mh@informatik.uni-kiel.de>",
+    "synopsis": "Libraries for better HTML programming.",
+    "category": [ "Web" ],
+    "dependencies": {
+        "currypath": ">= 0.0.1",
+        "flatcurry": ">= 2.0.0",
+        "random"   : ">= 0.0.1"
+    },
+    "sourceDirs": [ "src", "scripts" ],
+    "exportedModules": [ "HTML.Base",
+                         "HTML.CategorizedList", "HTML.LaTeX",
+                         "HTML.Parser",
+                         "HTML.Styles.Bootstrap3" ],
+    "compilerCompatibility": {
+        "pakcs": ">= 2.0.0",
+        "kics2": ">= 2.0.0"
+    },
+    "license": "BSD-3-Clause",
+    "licenseFile": "LICENSE",
+    "executable": {
+        "name": "curry2cgi",
+        "main": "Curry2CGI"
+    },
+    "source": {
+        "git": "https://git.ps.informatik.uni-kiel.de/curry-packages/html.git",
+        "tag": "$version"
+    }
+}
