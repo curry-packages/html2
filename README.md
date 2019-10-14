@@ -3,7 +3,7 @@ html2: Support for HTML programming
 
 This package contains libraries to support HTML programming.
 It provides a similar API as package `html`.
-In contract to package `html`, this library implements
+In contrast to package `html`, this library implements
 dynamic web pages without server processes waiting for answers
 form the client (web browser). Thus, it does not need
 the Curry Port Name Server (CPNS), the HTML/CGI Registry, etc.
