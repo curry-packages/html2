@@ -83,7 +83,7 @@ isUpperEqual c c' = toUpper c == toUpper c'
 
 -- just for testing ----------------------------------------
 
-main = return $ form "CatTest"
+main = return $ page "CatTest"
                      (categorizeByItemKey (stringList2ItemList testList))
 
 testList = ["bbcd",
@@ -100,4 +100,4 @@ testList = ["bbcd",
             "mxt",
             "mxtr"]
 
--- makecurrycgi -o ~/public_html/cat.cgi CategorizedHtmlList
+-- curry2cgi -o ~/public_html/cat.cgi CategorizedHtmlList

@@ -6,18 +6,19 @@
 ------------------------------------------------------------------------------
 
 import Time
+
 import HTML.Base
 import TimeForm ( timeForm )
 
 -- Example: a form with a text input field and two submit buttons.
 revDupForm :: HtmlFormDef String
-revDupForm = HtmlFormDef "RevDupTime.revDupForm" (return "") formHtml
+revDupForm = formDefWithID "RevDupTime.revDupForm" (return "") formHtml
  where
   formHtml _ =
-    [ htxt "Enter a string: ", textfield ref ""
+    [ htxt "Enter a string: ", textField ref ""
     , hrule
-    , formButton "Reverse string" revHandler
-    , formButton "Duplicate string" dupHandler
+    , button "Reverse string" revHandler
+    , button "Duplicate string" dupHandler
     ]
    where
     ref free

@@ -75,7 +75,8 @@ showLatexExp (HtmlStruct tag attrs htmlexp)
  | otherwise   = "{\\tt<"++tag++">}" ++ showLatexExps htmlexp ++
                 "{\\tt</"++tag++">}"
 showLatexExp (HtmlCRef  _ _) = error "HTML.LaTeX.showLatexExp: HtmlCref"
-showLatexExp (HtmlEvent _ _) = error "HTML.LaTeX.showLatexExp: HtmlEvent"
+showLatexExp (HtmlEvent _ _ _) = error "HTML.LaTeX.showLatexExp: HtmlEvent"
+showLatexExp (HtmlAction _)    = error "HTML.LaTeX.showLatexExp: HtmlAction"
 
 -- create latex environment of name "env" with content "content"
 latexEnvironment :: String -> String -> String
@@ -142,8 +143,10 @@ showLatexTableContent (HtmlStruct tag attrs htmlexp)
                  "{\\tt</"++tag++">}"
 showLatexTableContent (HtmlCRef  _ _) =
   error "HTML.LaTeX.showLatexTableContent: HtmlCref"
-showLatexTableContent (HtmlEvent _ _) =
+showLatexTableContent (HtmlEvent _ _ _) =
   error "HTML.LaTeX.showLatexTableContent: HtmlEvent"
+showLatexTableContent (HtmlAction _) =
+  error "HTML.LaTeX.showLatexTableContent: HtmlAction"
 
 -- find a specific tag field in a list of HTML attributes:
 findHtmlAttr :: String -> [(String,String)] -> Maybe String

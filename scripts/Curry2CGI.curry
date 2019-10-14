@@ -5,7 +5,7 @@
 --- for executing cgi scripts.
 ---
 --- @author Michael Hanus
---- @version September 2019
+--- @version October 2019
 ------------------------------------------------------------------------------
 
 module Curry2CGI
@@ -21,17 +21,18 @@ import ReadNumeric  ( readNat )
 import System
 import Time         ( calendarTimeToString, getLocalTime )
 
-import FlatCurry.Types
-import System.CurryPath  ( stripCurrySuffix )
+import AbstractCurry.Types ( QName )
+import System.CurryPath    ( stripCurrySuffix )
 
-import ExtractForms      ( extractFormsInProg )
+import ExtractForms        ( extractFormsInProg, showQName )
 
 main :: IO ()
 main = do
   args <- getArgs
   (opts,prog) <- processOptions args
   checkCurrySystem (optSystem opts)
-  formops <- mapM (extractFormsInProg (optSystem opts)) (optFormMods opts)
+  formops <- mapM (extractFormsInProg (optVerb opts) (optSystem opts))
+                  (optFormMods opts)
   compileCGI (opts { optForms = nub (concat formops) }) prog
 
 checkCurrySystem :: String -> IO ()
@@ -43,7 +44,7 @@ checkCurrySystem currydir = do
 
 compileCGI :: Options -> String -> IO ()
 compileCGI opts mname = do
-  putStrLn $ "Wrapping '" ++ mname ++ "' to generate CGI binary..."
+  putStrLnIfNQ opts $ "Wrapping '" ++ mname ++ "' to generate CGI binary..."
   pid <- getPID
   let mainmod  = mname ++ "_CGIMAIN_" ++ show pid
       maincall = "main_cgi_9999_" ++ show pid
@@ -51,12 +52,17 @@ compileCGI opts mname = do
                                           else optOutput opts
       cgidir   = dirName cgifile
   createDirectoryIfMissing True cgidir
-  writeFile (mainmod ++ ".curry") (genMainProg opts mname mainmod maincall)
+  let mainprog = genMainProg opts mname mainmod maincall
+  when (optVerb opts > 1) $ putStr $ unlines
+    [line, "GENERATED MAIN PROGRAM:", mainprog, line]
+  writeFile (mainmod ++ ".curry") mainprog
   -- compile main module:
-  cf <- system $ unwords
-    [optCPM opts, optSystem opts </> "bin" </> "curry", "--nocypm",
-     -- $CURRYDOPTIONS $CURRYOPTIONS
-     ":load", mainmod, ":save", maincall, ":quit"]
+  cf <- system $ unwords $
+    [ optCPM opts, optSystem opts </> "bin" </> "curry" , "--nocypm" ] ++
+    map (\rcopts -> "-D" ++ rcopts) (optCurryRC opts) ++
+    [ ":set", 'v' : show (optVerb opts) ] ++
+    optCurryOpts opts ++
+    [ ":load", mainmod, ":save", maincall, ":quit" ]
   when (cf > 0) $ do
     putStrLn "Error occurred, generation aborted."
     cleanMain mainmod
@@ -69,13 +75,14 @@ compileCGI opts mname = do
   cleanMain mainmod
   cdate <- getLocalTime >>= return . calendarTimeToString
   writeFile (cgifile ++ ".log") (cdate ++ ": cgi script compiled\n")
-  putStrLn $ "New files \"" ++ cgifile ++ "*\" with compiled cgi script generated."
+  putStrLnIfNQ opts $
+    "New files \"" ++ cgifile ++ "*\" with compiled cgi script generated."
  where
   cleanMain mainmod = do
     system $ unwords [optSystem opts </> "bin" </> "cleancurry", mainmod]
     system $ "/bin/rm -f " ++ mainmod ++ ".curry"
 
--- generate cgi shell script:
+-- Generates the small cgi shell script that actually calls the executable.
 genShellScript :: Options -> String -> IO ()
 genShellScript opts cgifile = do
   system $ "/bin/rm -f " ++ cgifile
@@ -91,6 +98,19 @@ genShellScript opts cgifile = do
   system $ unwords ["chmod", "755", cgifile]
   done
 
+--- Generates the main program which is compiled as the CGI executable.
+--- The program defines a main operation of the following form:
+---
+---     main :: IO ()
+---     main = HTML.CGI.Exec.printMainPage
+---              [ (<formid1>, HTML.CGI.Exec.execFormDef <formdef1>)
+---              , ...
+---              , (<formidk>, HTML.CGI.Exec.execFormDef <formdefk>)
+---              ]
+---              <mainpage>
+---
+--- where `<formid1>,...<formidk>` are the identifiers of all form definitions
+--- to be compiled.
 genMainProg :: Options -> String -> String -> String -> String
 genMainProg opts mname mainmod maincall = unlines $
   [ "module " ++ mainmod ++ "(" ++ maincall ++ ") where"
@@ -98,11 +118,12 @@ genMainProg opts mname mainmod maincall = unlines $
   , "import HTML.CGI.Exec" ] ++
   (map ("import " ++) (nub (mname : optFormMods opts))) ++
   [ maincall ++ " :: IO ()"
-  , maincall ++ " = HTML.CGI.Exec.showFormPageAction [" ++
-                      intercalate "," formCalls ++ "] (" ++ optMain opts ++ ")"
+  , maincall ++ " = HTML.CGI.Exec.printMainPage\n  [" ++
+                      intercalate "\n  ," formCalls ++ "]\n" ++
+                      "  (" ++ optMain opts ++ ")"
   ]
  where
-  formCalls = map (\f -> "(\"" ++ f ++ "\", HTML.CGI.Exec.showFormAction " ++
+  formCalls = map (\f -> "(\"" ++ f ++ "\", HTML.CGI.Exec.execFormDef " ++
                          f ++ ")")
                   (map showQName (optForms opts))
 
@@ -110,19 +131,24 @@ genMainProg opts mname mainmod maincall = unlines $
 -- Option processing for the script.
 
 data Options = Options
-  { optVerb    :: Int      -- verbosity (0: quiet, 1: status, 2: interm, 3: all)
-  , optHelp    :: Bool     -- if help info should be printed
-  , optOutput  :: String   -- name of the cgi program file (with suffix .cgi)
-  , optMain    :: String   -- the main expression
-  , optForms   :: [QName]  -- qualified names of form operations
-  , optFormMods:: [String] -- names of modules containing form operations
-  , optSystem  :: String   -- path to root of Curry system
-  , optCPM     :: String   -- command to invoke Curry Package Manager
-  , optLimit   :: String   -- ulimit settings for the cgi program
+  { optVerb      :: Int   -- verbosity (0: quiet, 1: status, 2: interm, 3: all)
+  , optHelp      :: Bool     -- if help info should be printed
+  , optOutput    :: String   -- name of the cgi program file (with suffix .cgi)
+  , optMain      :: String   -- the main expression
+  , optForms     :: [QName]  -- qualified names of form operations
+  , optFormMods  :: [String] -- names of modules containing form operations
+  , optSystem    :: String   -- path to root of Curry system
+  , optCPM       :: String   -- command to invoke Curry Package Manager
+  , optCurryRC   :: [String] -- curryrc options
+  , optCurryOpts :: [String] -- options passed to the Curry compiler
+  , optLimit     :: String   -- ulimit settings for the cgi program
   }
 
 defaultOptions :: Options
-defaultOptions = Options 1 False "" "" [] [] installDir "cypm exec" "-t 120"
+defaultOptions =
+  Options 1 False "" "" [] [] installDir "cypm exec"
+          [] [":set -time", ":set -interactive"]
+          "-t 120"
 
 --- Process the actual command line argument and return the options
 --- and the name of the main program.
@@ -158,7 +184,7 @@ options =
            "print help and exit"
   , Option "v" ["verb"]
             (OptArg (maybe (checkVerb 2) (safeReadNat checkVerb)) "<n>")
-            "verbosity level:\n0: quiet (same as `-q')\n1: show status messages (default)\n2: show intermediate results (same as `-v')\n3: show all details (e.g., SMT scripts)"
+            "verbosity level:\n0: quiet (same as `-q')\n1: show status messages (default)\n2: show intermediate results (same as `-v')\n3: show all details"
   , Option "m" ["main"]
             (ReqArg (\s opts -> opts { optMain = s }) "<m>")
             ("Curry expression (of type IO HtmlPage) computing\n" ++
@@ -177,9 +203,13 @@ options =
             ("set path to the root of Curry system\n" ++
              "(then 'path/bin/curry' is invoked to compile script)")
   , Option "" ["cpmexec"]
-            (ReqArg (\s opts -> opts { optSystem = s }) "<c>")
+            (ReqArg (\s opts -> opts { optCPM = s }) "<c>")
             ("set the command to execute programs with the\n" ++
              "Curry Package Manager (default: 'cypm exec')")
+  , Option "D" []
+            (ReqArg (\s opts -> opts { optCurryRC = optCurryRC opts ++ [s] })
+                    "name=val")
+            "define (curry)rc property 'name' as 'val'"
   , Option "u" ["ulimit"]
             (ReqArg (\s opts -> opts { optLimit = s }) "<l>")
             ("set 'ulimit <l>' when executing the cgi program\n" ++
@@ -195,5 +225,11 @@ options =
   checkVerb n opts = if n>=0 && n<4
                      then opts { optVerb = n }
                      else error "Illegal verbosity level (try `-h' for help)"
+
+putStrLnIfNQ :: Options -> String -> IO ()
+putStrLnIfNQ opts s = unless (optVerb opts == 0) $ putStrLn s
+
+line :: String
+line = take 78 (repeat '-')
 
 -------------------------------------------------------------------------

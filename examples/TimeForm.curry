@@ -8,9 +8,9 @@ import HTML.Base
 
 -- Example: a form with button to show the current time.
 timeForm :: HtmlFormDef String
-timeForm = HtmlFormDef "TimeForm.timeForm" (return "") formHtml
+timeForm = formDefWithID "TimeForm.timeForm" (return "") formHtml
  where
-  formHtml _ = [ formButton "Show time" timeHandler ]
+  formHtml _ = [ button "Show time" timeHandler ]
    where
     timeHandler _ = do
       ltime <- getLocalTime

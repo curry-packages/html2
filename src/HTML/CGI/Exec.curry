@@ -5,14 +5,14 @@
 --- to compile Curry CGI scripts into executables.
 ---
 --- @author Michael Hanus
---- @version September 2019
+--- @version October 2019
 ------------------------------------------------------------------------------
 
-module HTML.CGI.Exec ( showFormPageAction, showFormAction )
+module HTML.CGI.Exec ( printMainPage, execFormDef )
  where
 
 import IO          ( hPutStrLn, stderr )
-import List        ( intercalate )
+import List        ( intercalate, split )
 import ReadNumeric ( readHex, readNat )
 import System      ( getEnviron )
 import Time        ( calendarTimeToString, getLocalTime )
@@ -21,37 +21,44 @@ import HTML.Base
 
 ------------------------------------------------------------------------------
 
---- Shows the HTML page generated from the parameter action
+--- Shows the HTML page generated from the second parameter
 --- as a string on stdout.
 --- The forms possibly contained in the HTML page are passed as parameters,
---- where the elements are usually `(formid, showFormAction formdef)`.
---- This operation is used by the script to compile web scripts
+--- where the elements are usually of the form
+--- `(formid, execFormDef formdef)`.
+--- This operation is used by the script `curry2gi` to compile web scripts
 --- into executables.
-showFormPageAction :: [(String, [(String,String)] -> IO ())] -> IO HtmlPage
-                   -> IO ()
-showFormPageAction formmap genpage = catchFormErrors $ do
+printMainPage :: [(String, [(String,String)] -> IO ())] -> IO HtmlPage -> IO ()
+printMainPage formmap genpage = catchFormErrors $ do
   cgivars <- getFormVariables
-  maybe (genpage >>= showPage)
-        (\formid -> maybe (showPage (formNotCompiledPage formid))
+  maybe (genpage >>= execPage >>= printPage)
+        (\formid -> maybe (printPage (formNotCompiledPage formid))
                           (\f -> f cgivars)
                           (lookup formid formmap))
         (lookup "FORMID" cgivars)
 
---- Processes a submitted HTML form by reading the data and
---- construct the initial form to find the corresponding event handler.
---- The list of CGI variables/values if passed as the second argument.
-showFormAction :: HtmlFormDef a -> [(String,String)] -> IO ()
-showFormAction (HtmlFormDef _ readact formgen) cgivars = catchFormErrors $ do
+--- Translates a form definition into an operation which takes
+--- CGI variables and their values and produces the HTML text on
+--- standard output.
+--- The generated operation processes reads the required data (by executing
+--- the read action of the form definition) and
+--- constructs the initial form to find the corresponding event handler
+--- contained in this form.
+--- The list of CGI variables/values is passed as the second argument.
+execFormDef :: HtmlFormDef a -> [(String,String)] -> IO ()
+execFormDef (HtmlFormDef _ readact formgen) cgivars = catchFormErrors $ do
   val <- readact
-  let (iform,_) = instCgiRefs (formgen val) 0
+  hexps <- mapM execHtml (formgen val)
+  let (iform,_) = instCgiRefs hexps 0
   let cenv = cgiGetValue cgivars
   p <- maybe (return noHandlerPage) (\h -> h cenv) (findHandler cenv iform)
-  showPage p
+  execPage p >>= printPage
+  -- for debugging:
   --let fenv = unlines $ map (\ (x,y) -> x ++ "=" ++ y) cgivars
   --putStrLn ("Content-type: text/plain\n\n" ++ fenv)
 
 --- Catches run-time errors, print them on stderr and also
---- in a specific webpages.
+--- in a specific web page.
 catchFormErrors :: IO () -> IO ()
 catchFormErrors formact = catch formact showFormError
  where
@@ -59,14 +66,17 @@ catchFormErrors formact = catch formact showFormError
     let errstr = showError err
     cdate <- getLocalTime >>= return . calendarTimeToString
     hPutStrLn stderr $ cdate ++ ": " ++ errstr
-    showPage $ page "Run-time exception"
+    printPage $ page "Run-time exception"
       [h1 [htxt "Run-time exception occurred"],
        par [htxt "An error occurred during the execution of the web script."],
        par [htxt $ "Error message: " ++ errstr]]
 
 --- Shows a HTML page on stdout.
-showPage :: HtmlPage -> IO ()
-showPage p = do
+printPage :: HtmlPage -> IO ()
+printPage (HtmlAnswer ctype cont) = do
+  putStrLn $ "Content-Length: " ++ show (length cont) ++
+             "\nContent-Type: " ++ ctype ++ "\n\n" ++ cont
+printPage p@(HtmlPage _ _ _) = do
   let (cookiestring,hpage) = extractCookies p
   putStrLn $ cookiestring ++
              "Content-type: text/html\n\n" ++ showHtmlPage hpage
@@ -74,6 +84,7 @@ showPage p = do
 -- Extract the cookies contained in a HTML page and return the
 -- "set cookie" string and the HTML page without the cookies:
 extractCookies :: HtmlPage -> (String,HtmlPage)
+extractCookies (HtmlAnswer ctype cont) = ("", HtmlAnswer ctype cont)
 extractCookies (HtmlPage title params hexp) =
   let cookiestring = if null cookies
                      then ""
@@ -111,20 +122,41 @@ cgiGetValue cgivars cgiref =
   intercalate "\n" (map snd (filter (((idOfCgiRef cgiref) ==) . fst) cgivars))
 
 -- Find the handler corresponding to the variables in the CGI environment.
-findHandler :: CgiEnv -> [HtmlExp] -> Maybe HtmlPageHandler
+findHandler :: CgiEnv -> [HtmlExp] -> Maybe HtmlHandler
 findHandler _ [] = Nothing
 findHandler cenv (HtmlText _ : hexps) = findHandler cenv hexps
 findHandler cenv (HtmlStruct _ _ hexps1 : hexps2) =
   findHandler cenv (hexps1 ++ hexps2)
-findHandler cenv (HtmlEvent _ _ : hexps) = findHandler cenv hexps
-findHandler cenv (HtmlRefEvent _ cgiref handler : hexps) =
+findHandler cenv (HtmlEvent _ cgiref handler : hexps) =
   if null (cenv cgiref)
     then findHandler cenv hexps
     else Just handler
 findHandler cenv (HtmlCRef hexp _ : hexps) = findHandler cenv (hexp : hexps)
+findHandler _ (HtmlAction _    : _) =
+  error "HTML.CGI.Exec: HtmlAction occurred"
 
 ------------------------------------------------------------------------------
---- Gets the list of variable/value pairs sent from the browser for the
+-- Executes an HTML page, i.e., execute all HtmlActions contained
+-- in the HTML expressions and replaces them by their computed results.
+execPage :: HtmlPage -> IO HtmlPage
+execPage (HtmlPage title params hexps) =
+  mapM execHtml hexps >>= return . HtmlPage title params
+execPage (HtmlAnswer t c) = return (HtmlAnswer t c)
+
+-- Executes an HTML expression, i.e., execute all HtmlActions contained
+-- in it and replaces them by their computed results.
+execHtml :: HtmlExp -> IO HtmlExp
+execHtml htmlexp = case htmlexp of
+  HtmlText   _           -> return htmlexp
+  HtmlStruct tag ats hes -> mapM execHtml hes >>= return . HtmlStruct tag ats
+  HtmlCRef   he cref     -> do hexp <- execHtml he
+                               return (HtmlCRef hexp cref)
+  HtmlEvent  he cref hdl -> do hexp <- execHtml he
+                               return (HtmlEvent hexp cref hdl)
+  HtmlAction act         -> act >>= execHtml
+
+------------------------------------------------------------------------------
+--- Gets the list of variable/value pairs sent from the browser to the
 --- current CGI script.
 --- Used for the implementation of HTML event handlers.
 getFormVariables :: IO [(String,String)]
@@ -135,24 +167,14 @@ getFormVariables = do
 
 -- translate a string of cgi environment bindings into list of binding pairs:
 parseCgiEnv :: String -> [(String,String)]
-parseCgiEnv s | s == ""   = []
-              | otherwise = map ufield2field
-                             (map (\(n,v)->(n,utf2latin (urlencoded2string v)))
-                                  (map (splitChar '=') (split (=='&') s)))
+parseCgiEnv s
+  | s == ""   = []
+  | otherwise = map (\ (n,v) -> (n, utf2latin (urlencoded2string v)))
+                    (map (splitChar '=') (split (=='&') s))
  where
-   ufield2field (n,v) = if take 7 n == "UFIELD_"
-                        then (tail n, utf2latin (urlencoded2string v))
-                        else (n,v)
-
-   -- split a string at particular character:
+   -- split a string at the first position of a given character:
    splitChar c xs = let (ys,zs) = break (==c) xs
                     in if zs==[] then (ys,zs) else (ys,tail zs)
-
-   -- split a string at all positions of a particular character:
-   split p xs =
-    let (ys,zs) = break p xs
-    in if zs==[] then [ys]
-                 else ys : split p (tail zs)
 
 --- Translates urlencoded string into equivalent ASCII string.
 urlencoded2string :: String -> String
@@ -165,11 +187,11 @@ urlencoded2string (c:cs)
 
 --- Transforms a string with UTF-8 umlauts into a string with latin1 umlauts.
 utf2latin :: String -> String
-utf2latin [] = []
+utf2latin []  = []
 utf2latin [c] = [c]
 utf2latin (c1:c2:cs)
- | ord c1 == 195 = chr (ord c2 + 64) : utf2latin cs
- | otherwise     = c1 : utf2latin (c2:cs)
+  | ord c1 == 195 = chr (ord c2 + 64) : utf2latin cs
+  | otherwise     = c1 : utf2latin (c2:cs)
 
 includeCoordinates :: [(String,String)] -> [(String,String)]
 includeCoordinates [] = []

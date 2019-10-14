@@ -3,7 +3,7 @@
 -- A web page with a form containing a text input field and two submit buttons
 -- to reverse and duplicate the input string.
 -- Here we use session data to store the string typed into the input
--- field in order to use it for a subsequent form.
+-- field in order to use it for the subsequent form.
 ------------------------------------------------------------------------------
 
 import FilePath ( (</>) )
@@ -18,15 +18,15 @@ rdInput = global emptySessionStore (Persistent ("." </> "rdInput"))
 
 -- Example: a form with a text input field and two submit buttons.
 revDupForm :: HtmlFormDef String
-revDupForm = HtmlFormDef "RevDupSession.revDupForm" readInfo formHtml
+revDupForm = formDefWithID "RevDupSession.revDupForm" readInfo formHtml
  where
   readInfo = getSessionData rdInput ""
 
   formHtml s =
-    [ htxt "Enter a string: ", textfield ref s
+    [ htxt "Enter a string: ", textField ref s
     , hrule
-    , formButton "Reverse string" revHandler
-    , formButton "Duplicate string" dupHandler
+    , button "Reverse string" revHandler
+    , button "Duplicate string" dupHandler
     ]
    where
     ref free
@@ -45,7 +45,7 @@ revDupForm = HtmlFormDef "RevDupSession.revDupForm" readInfo formHtml
 
 -- main HTML page containing the form
 main :: IO HtmlPage
-main = withSessionCookie $ page "Question"
+main = withSessionCookieInfo $ page "Question"
   [ h1 [htxt "This is an example form"]
   , formExp revDupForm
   ]

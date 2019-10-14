@@ -3,20 +3,20 @@
 --- [This paper](http://www.informatik.uni-kiel.de/~mh/papers/PADL01.html)
 --- contains a description of the basic ideas behind this library.
 ---
---- The installation of a cgi script written with this library
---- can be done by the command
+--- A cgi script written with this library can be installed
+--- by the command
 ---
----     curry makecgi -m initialForm -o /home/joe/public_html/prog.cgi prog
+---     cypm exec curry2cgi -m mainPage -o /home/joe/public_html/prog.cgi Prog
 ---
---- where `prog` is the name of the Curry program with
+--- where `Prog` is the name of the Curry program with
 --- the cgi script, `/home/joe/public_html/prog.cgi` is
 --- the desired location of the
---- compiled cgi script, and `initialForm` is the Curry expression
---- (of type IO HtmlForm) computing the HTML form (where `curry`
---- is the shell command calling the Curry system PAKCS or KiCS2).
+--- compiled cgi script, and `mainPage` is the Curry expression
+--- (of type `IO HtmlPage`) computing the HTML page (where `cypm`
+--- is the command calling the Curry Package Manager).
 ---
 --- @author Michael Hanus (with extensions by Bernd Brassel and Marco Comini)
---- @version September 2019
+--- @version October 2019
 ------------------------------------------------------------------------------
 
 {-# OPTIONS_CYMAKE -Wno-incomplete-patterns #-}
@@ -24,16 +24,15 @@
 module HTML.Base
  ( HtmlExp(..), textOf,
    HtmlPage(..), PageParam(..),
-   HtmlFormDef(..), formDefId,
-   HtmlForm(..), FormParam(..), CookieParam(..),
-   CgiRef, idOfCgiRef, instCgiRefs, CgiEnv, HtmlHandler, HtmlPageHandler,
+   HtmlFormDef(..), formDefWithID, formDefId,
+   CookieParam(..),
+   CgiRef, idOfCgiRef, instCgiRefs, CgiEnv, HtmlHandler,
    defaultEncoding,
-   form,standardForm,answerText,answerEncText,
-   cookieForm,getCookies,
+   answerText,answerEncText,
+   getCookies,
    page,standardPage,
    pageEnc, pageCookie, pageCSS, pageMetaInfo,
    pageLinkInfo, pageBodyAttr, addPageParam, addPageCookies,
-   formEnc,formCSS,formMetaInfo,formBodyAttr,addFormParam,addFormParams,
    htxt,htxts,hempty,nbsp,h1,h2,h3,h4,h5,
    par,section,header,footer,emphasize,strong,bold,italic,nav,code,
    center,blink,teletype,pre,verbatim,address,href,anchor,
@@ -41,29 +40,27 @@ module HTML.Base
    hrule,breakline,image,
    styleSheet,style,textstyle,blockstyle,inline,block,
    redirect,expires,
-   formExp, formButton,
-   button,resetbutton,imageButton,coordinates,
-   textfield,password,textarea,checkbox,checkedbox,
-   radio_main,radio_main_off,radio_other,
+   formExp,
+   button,resetButton,imageButton,coordinates,
+   textField,password,textArea,checkBox,checkedBox,
+   radioMain,radioMainOff,radioOther,
    selection,selectionInitial,multipleSelection,
    hiddenfield,htmlQuote,htmlIsoUmlauts,addAttr,addAttrs,addClass,
    showHtmlExps,showHtmlExp,showHtmlPage,
    htmlPrelude, htmlTagAttrs,
    getUrlParameter,urlencoded2string,string2urlencoded,
-   addSound,addCookies, formatCookie
+   formatCookie
  ) where
 
 import Char        ( isAlphaNum, isSpace )
 import ReadNumeric ( readNat, readHex )
 import System      ( getEnviron )
 import Time        ( CalendarTime(..), ClockTime, toTimeString, toUTCTime )
-import Unsafe -- for the moment...
 
 infixl 0 `addAttr`
 infixl 0 `addAttrs`
 infixl 0 `addClass`
 infixl 0 `addPageParam`
-infixl 0 `addFormParam`
 
 ------------------------------------------------------------------------------
 --- The default encoding used in generated web pages.
@@ -85,11 +82,8 @@ idOfCgiRef (CgiRef i) = i
 --- the input elements).
 type CgiEnv = CgiRef -> String
 
---- The type of event handlers in HTML forms.
-type HtmlHandler = CgiEnv -> IO HtmlForm
-
---- The type of event handlers yielding an HTML page.
-type HtmlPageHandler = CgiEnv -> IO HtmlPage
+--- The type of event handlers occurring in HTML forms.
+type HtmlHandler = CgiEnv -> IO HtmlPage
 
 --- The data type for representing HTML expressions.
 --- @cons HtmlText s - a text string without any further structure
@@ -97,44 +91,55 @@ type HtmlPageHandler = CgiEnv -> IO HtmlPage
 ---                            HTML expressions inside the structure
 --- @cons HtmlCRef h ref - an input element (described by the first argument)
 ---                        with a cgi reference
---- @cons HtmlEvent h hdlr - an input element (first arg) with an associated
----                          event handler (typically, a submit button)
---- @cons HtmlRefEvent h ref hdlr - an input element (first arg) identified
----                                 by a cgi reference with an associated
----                                 event handler (typically, a submit button)
+--- @cons HtmlEvent h ref hdlr - an input element (first arg) identified
+---                              by a cgi reference with an associated
+---                              event handler (typically, a submit button)
+--- @cons HtmlAction act - an action that computes an HTML expression
+---                      which will be inserted when the HTML document is shown
 data HtmlExp =
-   HtmlText     String
- | HtmlStruct   String [(String,String)] [HtmlExp]
- | HtmlCRef     HtmlExp CgiRef
- | HtmlEvent    HtmlExp HtmlHandler
- | HtmlRefEvent HtmlExp CgiRef HtmlPageHandler
+    HtmlText   String
+  | HtmlStruct String [(String,String)] [HtmlExp]
+  | HtmlCRef   HtmlExp CgiRef
+  | HtmlEvent  HtmlExp CgiRef HtmlHandler
+  | HtmlAction (IO HtmlExp)
 
 --- Extracts the textual contents of a list of HTML expressions.
----
 --- For instance,
---- <code>textOf [HtmlText "xy", HtmlStruct "a" [] [HtmlText "bc"]] == "xy bc"</code>
+---
+---      textOf [HtmlText "xy", HtmlStruct "a" [] [HtmlText "bc"]] == "xy bc"
+---
 textOf :: [HtmlExp] -> String
 textOf = unwords . filter (not . null) . map textOfHtmlExp
  where
    textOfHtmlExp (HtmlText s) = s
-   textOfHtmlExp (HtmlStruct _ _ hs) = textOf hs
-   textOfHtmlExp (HtmlCRef   hexp _) = textOf [hexp]
-   textOfHtmlExp (HtmlEvent  hexp _) = textOf [hexp]
-   textOfHtmlExp (HtmlRefEvent hexp _ _) = textOf [hexp]
-
+   textOfHtmlExp (HtmlStruct _ _ hs)   = textOf hs
+   textOfHtmlExp (HtmlCRef   hexp _)   = textOf [hexp]
+   textOfHtmlExp (HtmlEvent  hexp _ _) = textOf [hexp]
+   textOfHtmlExp (HtmlAction _)        = ""
 
 ------------------------------------------------------------------------------
 --- The data type for representing HTML forms embedded into HTML pages.
 ---
---- A form consists of a unique identifier of form (usually,
+--- A form definition consists of a unique identifier of form (usually,
 --- the qualified name of the operation defining the form),
 --- a (reading!) IO action and a mapping from data
---- into an HTML expression that might contain event handlers
---- to produce the form answers.
+--- into an HTML expression (which usually contains event handlers
+--- to produce the form answers).
 --- It is assumed that the IO action reads only data and does not
 --- change it, since it is applied twice when executing a form.
 data HtmlFormDef a = HtmlFormDef String (IO a) (a -> [HtmlExp])
 
+--- A definition of a form with a unique identifier of form (usually,
+--- the qualified name of the operation defining the form).
+--- A form contains a (reading!) IO action and a mapping from data
+--- into an HTML expression (which usually contains event handlers
+--- to produce the form answers).
+--- It is assumed that the IO action reads only data and does not
+--- change it, since it is applied twice when executing a form.
+formDefWithID :: String -> IO a -> (a -> [HtmlExp]) -> HtmlFormDef a
+formDefWithID = HtmlFormDef
+
+--- Returns the identifier of a form definition.
 formDefId :: HtmlFormDef a -> String
 formDefId (HtmlFormDef s _ _) = s
 
@@ -157,233 +162,27 @@ instCgiRefs (HtmlStruct tag attrs hexps1 : hexps2) i =
   case instCgiRefs hexps1 i of
     (nhexps1,j) -> case instCgiRefs hexps2 j of
                      (nhexps2,k) -> (HtmlStruct tag attrs nhexps1 : nhexps2, k)
-instCgiRefs (HtmlEvent (HtmlStruct tag attrs hes) handler : hexps) i =
-  case instCgiRefs hexps i of
-    (nhexps,j) -> (HtmlEvent (HtmlStruct tag attrs hes) handler : nhexps, j)
-instCgiRefs (HtmlRefEvent (HtmlStruct tag attrs hes) cgiref handler : hexps) i
+instCgiRefs (HtmlEvent (HtmlStruct tag attrs hes) cgiref handler : hexps) i
   | idOfCgiRef cgiref =:= ("FIELD_" ++ show i)
   = case instCgiRefs hexps (i+1) of
       (nhexps,j) ->
-         (HtmlRefEvent (HtmlStruct tag attrs hes) cgiref handler : nhexps, j)
+         (HtmlEvent (HtmlStruct tag attrs hes) cgiref handler : nhexps, j)
 instCgiRefs (HtmlCRef hexp cgiref : hexps) i
   | idOfCgiRef cgiref =:= ("FIELD_" ++ show i)
   = case instCgiRefs [hexp] (i+1) of
       ([nhexp],j) -> case instCgiRefs hexps j of
                        (nhexps,k) -> (nhexp : nhexps, k)
-
-------------------------------------------------------------------------------
---- The data type for representing HTML forms (active web pages)
---- and return values of HTML forms.
---- @cons HtmlForm t ps hs - an HTML form with title t, optional parameters
----         (e.g., cookies) ps, and contents hs
---- @cons HtmlAnswer t c - an answer in an arbitrary format where t
----         is the content type (e.g., "text/plain") and c is the contents
-data HtmlForm =
-        HtmlForm String [FormParam] [HtmlExp]
-      | HtmlAnswer String String -- content type (e.g., "text/plain") / content
-
---- The possible parameters of an HTML form.
---- The parameters of a cookie (FormCookie) are its name and value and
---- optional parameters (expiration date, domain, path (e.g., the path "/"
---- makes the cookie valid for all documents on the server), security) which
---- are collected in a list.
---- @cons FormCookie name value params - a cookie to be sent to the
----                                      client's browser
---- @cons FormCSS s - a URL for a CSS file for this form
---- @cons FormJScript s - a URL for a Javascript file for this form
---- @cons FormOnSubmit s - a JavaScript statement to be executed when the form
----                        is submitted (i.e., &lt;form ... onsubmit="s"&gt;)
---- @cons FormTarget s - a name of a target frame where the output of the
----                      script should be represented (should only be used
----                      for scripts running in a frame)
---- @cons FormEnc - the encoding scheme of this form
---- @cons FormMeta as - meta information (in form of attributes) for this form
---- @cons HeadInclude he - HTML expression to be included in form header
---- @cons MultipleHandlers - indicates that the event handlers of the form
----   can be multiply used (i.e., are not deleted if the form is submitted
----   so that they are still available when going back in the browser;
----   but then there is a higher risk that the web server process
----   might overflow with unused events); the default is a single use
----   of event handlers, i.e., one cannot use the back button in the
----   browser and submit the same form again (which is usually
----   a reasonable behavior to avoid double submissions of data).
---- @cons BodyAttr  ps - optional attribute for the body element (more than
----                      one occurrence is allowed)
-data FormParam = FormCookie   String String [CookieParam]
-               | FormCSS      String
-               | FormJScript  String
-               | FormOnSubmit String
-               | FormTarget   String
-               | FormEnc      String
-               | FormMeta     [(String,String)]
-               | HeadInclude  HtmlExp
-               | MultipleHandlers
-               | BodyAttr     (String,String)
-
---- An encoding scheme for a HTML form.
-formEnc :: String -> FormParam
-formEnc enc = FormEnc enc
-
---- A URL for a CSS file for a HTML form.
-formCSS :: String -> FormParam
-formCSS css = FormCSS css
-
---- Meta information for a HTML form. The argument is a list of
---- attributes included in the `meta`-tag in the header for this form.
-formMetaInfo :: [(String,String)] -> FormParam
-formMetaInfo attrs = FormMeta attrs
-
---- Optional attribute for the body element of the HTML form.
---- More than one occurrence is allowed, i.e., all such attributes are
---- collected.
-formBodyAttr :: (String,String) -> FormParam
-formBodyAttr attr = BodyAttr attr
-
---- A cookie to be sent to the client's browser when a HTML form is
---- requested.
-formCookie :: (String,String) -> FormParam
-formCookie (n,v) = FormCookie n v []
-
---- The possible parameters of a cookie.
-data CookieParam = CookieExpire ClockTime
-                 | CookieDomain String
-                 | CookiePath   String
-                 | CookieSecure
-
---- A basic HTML form for active web pages with the default encoding
---- and a default background.
---- @param title - the title of the form
---- @param hexps - the form's body (list of HTML expressions)
---- @return an HTML form
-form :: String -> [HtmlExp] -> HtmlForm
-form title hexps = HtmlForm title [] hexps
-
---- A standard HTML form for active web pages where the title is included
---- in the body as the first header.
---- @param title - the title of the form
---- @param hexps - the form's body (list of HTML expressions)
---- @return an HTML form with the title as the first header
-standardForm :: String -> [HtmlExp] -> HtmlForm
-standardForm title hexps = form title (h1 [htxt title] : hexps)
-
---- An HTML form with simple cookies.
---- The cookies are sent to the client's browser together with this form.
---- @param title - the title of the form
---- @param cookies - the cookies as a list of name/value pairs
---- @param hexps - the form's body (list of HTML expressions)
---- @return an HTML form
-cookieForm :: String -> [(String,String)] -> [HtmlExp] -> HtmlForm
-cookieForm t cs he = HtmlForm t (map (\(n,v)->FormCookie n v []) cs) he
-
---- Add simple cookie to HTML form.
---- The cookies are sent to the client's browser together with this form.
---- @param cs - the cookies as a list of name/value pairs
---- @param form - the form to add cookies to
---- @return a new HTML form
-addCookies :: [(String,String)] -> HtmlForm -> HtmlForm
-addCookies cs (HtmlForm t fas hs) =
-  HtmlForm t (map (\ (n,v) -> FormCookie n v []) cs ++ fas) hs
-addCookies _ (HtmlAnswer _ _) =
-  error "addCookies: cannot add cookie to Html answer"
-
--- Shows the cookie in standard syntax:
-formatCookie :: (String,String,[CookieParam]) -> String
-formatCookie (name,value,params) =
-  "Set-Cookie: " ++ name ++ "=" ++ string2urlencoded value ++
-  concatMap (\p->"; "++formatCookieParam p) params
-
--- Formats a cookie parameter:
-formatCookieParam :: CookieParam -> String
-formatCookieParam (CookieExpire e) = "expires=" ++ toCookieDateString e
-formatCookieParam (CookieDomain d) = "domain="  ++ d
-formatCookieParam (CookiePath   p) = "path="    ++ p
-formatCookieParam CookieSecure     = "secure"
-
--- Formats a clock time into a date string for cookies:
-toCookieDateString :: ClockTime -> String
-toCookieDateString time =
- let (CalendarTime y mo d h mi s tz) = toUTCTime time
-  in (show d ++ "-" ++ shortMonths!!(mo-1) ++ "-" ++ show y ++ " " ++
-         toTimeString (CalendarTime y mo d h mi s tz) ++ " UTC")
-  where shortMonths = ["Jan","Feb","Mar","Apr","May","Jun",
-                       "Jul","Aug","Sep","Oct","Nov","Dec"]
-
-
---- A textual result instead of an HTML form as a result for active web pages.
---- @param txt - the contents of the result page
---- @return an HTML answer form
-answerText :: String -> HtmlForm
-answerText = HtmlAnswer "text/plain"
-
---- A textual result instead of an HTML form as a result for active web pages
---- where the encoding is given as the first parameter.
---- @param enc - the encoding of the text(e.g., "utf-8" or "iso-8859-1")
---- @param txt - the contents of the result page
---- @return an HTML answer form
-answerEncText :: String -> String -> HtmlForm
-answerEncText enc = HtmlAnswer ("text/plain; charset="++enc)
-
---- Adds a parameter to an HTML form.
---- @param form - a form
---- @param param - a form's parameter
---- @return an HTML form
-addFormParam :: HtmlForm -> FormParam -> HtmlForm
-addFormParam (HtmlForm title params hexps) param =
-              HtmlForm title (param:params) hexps
-addFormParam hexp@(HtmlAnswer _ _) _ = hexp
-
-addFormParams :: HtmlForm -> [FormParam] -> HtmlForm
-addFormParams hform [] = hform
-addFormParams hform (fp:fps) = addFormParams (hform `addFormParam` fp) fps
-
---- Adds redirection to given HTML form.
---- @param secs - Number of seconds to wait before executing autromatic redirection
---- @param url - The URL whereto redirect to
---- @param form - The form to add the header information to
-redirect :: Int -> String -> HtmlForm -> HtmlForm
-redirect secs url hform =
-  hform `addFormParam`
-      HeadInclude (HtmlStruct "meta" [("http-equiv","refresh"),
-                                      ("content",show secs++"; URL="++url)] [])
-
---- Adds expire time to given HTML form.
---- @param secs - Number of seconds before document expires
---- @param form - The form to add the header information to
-expires :: Int -> HtmlForm -> HtmlForm
-expires secs hform =
-  hform `addFormParam`
-      HeadInclude (HtmlStruct "meta" [("http-equiv","expires"),
-                                      ("content",show secs)] [])
-
---- Adds sound to given HTML form. The functions adds two different declarations
---- for sound, one invented by Microsoft for the internet explorer, one introduced
---- for netscape. As neither is an official part of HTML, addsound might not work
---- on all systems and browsers. The greatest chance is by using sound files
---- in MID-format.
---- @param soundfile - Name of file containing the sound to be played
---- @param loop - Should sound go on infinitely? Use with care.
---- @param form - The form to add sound to
-addSound :: String -> Bool -> HtmlForm -> HtmlForm
-addSound soundfile loop (HtmlForm title params conts) =
-  HtmlForm title
-           (HeadInclude
-             (HtmlStruct "bgsound"
-                         [("src",soundfile),
-                         ("loop",if loop then "infinite" else "1")] []):params)
-           (HtmlStruct "embed"
-             ((if loop then [("loop","true")] else []) ++
-              [("src",soundfile),("autostart","true"), ("hidden","true"),
-               ("height","0"), ("width","0")]) []:
-              conts)
-addSound _ _ (HtmlAnswer _ _)
-  = error "HTML.addSound: unable to add sound to general HTML Answer"
-
+instCgiRefs (HtmlAction _ : _) _ =
+  error "HTML.Base.instCgiRefs: HtmlAction occurred"
 
 ------------------------------------------------------------------------------
 --- The data type for representing HTML pages.
---- The constructor arguments are the title, the parameters, and
---- the contents (body) of the web page.
+--- @cons HtmlPage t ps hs - an HTML page with title t, optional parameters
+---         (e.g., cookies) ps, and contents hs
+--- @cons HtmlAnswer t c - an answer in an arbitrary format where t
+---         is the content type (e.g., "text/plain") and c is the contents
 data HtmlPage = HtmlPage String [PageParam] [HtmlExp]
+              | HtmlAnswer String String
 
 --- The possible parameters of an HTML page.
 --- The parameters of a cookie (`PageCookie`) are its name and value and
@@ -397,15 +196,17 @@ data HtmlPage = HtmlPage String [PageParam] [HtmlExp]
 --- @cons PageJScript s - a URL for a Javascript file for this page
 --- @cons PageMeta as - meta information (in form of attributes) for this page
 --- @cons PageLink as - link information (in form of attributes) for this page
+--- @cons PageHeadInclude he - HTML expression to be included in page header
 --- @cons PageBodyAttr attr - optional attribute for the body element of the
 ---                           page (more than one occurrence is allowed)
-data PageParam = PageEnc      String
-               | PageCookie   String String [CookieParam]
-               | PageCSS      String
-               | PageJScript  String
-               | PageMeta     [(String,String)]
-               | PageLink     [(String,String)]
-               | PageBodyAttr (String,String)
+data PageParam = PageEnc         String
+               | PageCookie      String String [CookieParam]
+               | PageCSS         String
+               | PageJScript     String
+               | PageMeta        [(String,String)]
+               | PageLink        [(String,String)]
+               | PageHeadInclude HtmlExp
+               | PageBodyAttr    (String,String)
 
 --- An encoding scheme for a HTML page.
 pageEnc :: String -> PageParam
@@ -458,6 +259,7 @@ standardPage title hexps = page title (h1 [htxt title] : hexps)
 addPageParam :: HtmlPage -> PageParam -> HtmlPage
 addPageParam (HtmlPage title params hexps) param =
   HtmlPage title (param:params) hexps
+addPageParam hexp@(HtmlAnswer _ _) _ = hexp
 
 --- Add simple cookie to an HTML page.
 --- The cookies are sent to the client's browser together with this page.
@@ -467,6 +269,72 @@ addPageParam (HtmlPage title params hexps) param =
 addPageCookies :: [(String,String)] -> HtmlPage -> HtmlPage
 addPageCookies cs (HtmlPage title params hexps) =
   HtmlPage title (map pageCookie cs ++ params) hexps
+addPageCookies _ (HtmlAnswer _ _) =
+  error "addPageCookies: cannot add cookie to HTML answer"
+
+------------------------------------------------------------------------------
+--- The possible parameters of a cookie.
+data CookieParam = CookieExpire ClockTime
+                 | CookieDomain String
+                 | CookiePath   String
+                 | CookieSecure
+
+-- Shows the cookie in standard syntax:
+formatCookie :: (String,String,[CookieParam]) -> String
+formatCookie (name,value,params) =
+  "Set-Cookie: " ++ name ++ "=" ++ string2urlencoded value ++
+  concatMap (\p->"; "++formatCookieParam p) params
+
+-- Formats a cookie parameter:
+formatCookieParam :: CookieParam -> String
+formatCookieParam (CookieExpire e) = "expires=" ++ toCookieDateString e
+formatCookieParam (CookieDomain d) = "domain="  ++ d
+formatCookieParam (CookiePath   p) = "path="    ++ p
+formatCookieParam CookieSecure     = "secure"
+
+-- Formats a clock time into a date string for cookies:
+toCookieDateString :: ClockTime -> String
+toCookieDateString time =
+ let (CalendarTime y mo d h mi s tz) = toUTCTime time
+  in (show d ++ "-" ++ shortMonths!!(mo-1) ++ "-" ++ show y ++ " " ++
+         toTimeString (CalendarTime y mo d h mi s tz) ++ " UTC")
+  where shortMonths = ["Jan","Feb","Mar","Apr","May","Jun",
+                       "Jul","Aug","Sep","Oct","Nov","Dec"]
+
+
+--- A textual result instead of an HTML page as a result for active web pages.
+--- @param txt - the contents of the result page
+--- @return an HTML answer page
+answerText :: String -> HtmlPage
+answerText = HtmlAnswer "text/plain"
+
+--- A textual result instead of an HTML page as a result for active web pages
+--- where the encoding is given as the first parameter.
+--- @param enc - the encoding of the text(e.g., "utf-8" or "iso-8859-1")
+--- @param txt - the contents of the result page
+--- @return an HTML answer page
+answerEncText :: String -> String -> HtmlPage
+answerEncText enc = HtmlAnswer ("text/plain; charset="++enc)
+
+--- Adds redirection to given HTML page.
+--- @param secs - Number of seconds to wait before executing autromatic redirection
+--- @param url - The URL whereto redirect to
+--- @param page - The page to add the header information to
+redirect :: Int -> String -> HtmlPage -> HtmlPage
+redirect secs url hpage =
+  hpage `addPageParam`
+    PageHeadInclude
+      (HtmlStruct "meta" [("http-equiv","refresh"),
+                          ("content",show secs++"; URL="++url)] [])
+
+--- Adds expire time to given HTML page.
+--- @param secs - Number of seconds before document expires
+--- @param page - The page to add the header information to
+expires :: Int -> HtmlPage -> HtmlPage
+expires secs hpage =
+  hpage `addPageParam`
+    PageHeadInclude (HtmlStruct "meta" [("http-equiv","expires"),
+                                        ("content",show secs)] [])
 
 ------------------------------------------------------------------------------
 -- some useful abbreviations:
@@ -695,47 +563,40 @@ inline hexps = HtmlStruct "span" [] hexps
 block :: [HtmlExp] -> HtmlExp
 block hexps = HtmlStruct "div" [] hexps
 
+------------------------------------------------------------------------------
+-- Forms and input fields:
 
--------------- forms and input fields:
-
---- A form embedded in an HTML expression with a form parameter
---- and a unique identifier of form (usually, the qualified name of
---- operation defining this form).
---- The second argument might be automatically inserted
---- by a more sophisticated compiler...
+--- A form embedded in an HTML expression.
+--- The parameter is a form defined as an exported top-level operation
+--- in the CGI program so that it can be accessed by the main program.
 --- The URL of the generated form is the same as the main page, i.e.,
 --- the current URL parameter is passed to the form (which is
 --- useful for REST-based programming with URL parameters).
 --- The form uses a hidden field named `FORMID` to identify the form
 --- in the submitted form controller.
 formExp :: HtmlFormDef a -> HtmlExp
-formExp formspec =
-  let he       = unsafePerformIO (genInitForm formspec)
-      urlparam = unsafePerformIO getUrlParameter
-  in HtmlStruct "form" [("method","post"),("action",'?' : urlparam)]
-       (hiddenField "FORMID" (formDefId formspec) : fst (instCgiRefs he 0))
+formExp formspec = HtmlAction htmlAction
+ where
+  htmlAction = do
+    urlparam <- getUrlParameter
+    he       <- genInitForm formspec
+    return $
+       HtmlStruct "form" [("method","post"),("action",'?' : urlparam)]
+         (hiddenField "FORMID" (formDefId formspec) : fst (instCgiRefs he 0))
 
 --- A button to submit a form with a label string and an event handler.
-formButton :: String -> HtmlPageHandler -> HtmlExp
-formButton label handler
+button :: String -> HtmlHandler -> HtmlExp
+button label handler
   | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlRefEvent (HtmlStruct "input" [("type","submit"),("name",ref),
-                                      ("value",htmlQuote label)] [])
-                 cref handler
+  = HtmlEvent (HtmlStruct "input" [("type","submit"), ("name",ref),
+                                   ("value",htmlQuote label)] [])
+              cref handler
  where
   cref,ref free
 
---- Submit button with a label string and an event handler
-button :: String -> HtmlHandler -> HtmlExp
-button label handler =
-    HtmlEvent
-       (HtmlStruct "input" [("type","submit"),("name","EVENT"),
-                            ("value",htmlQuote label)] [])
-       handler
-
 --- Reset button with a label string
-resetbutton :: String -> HtmlExp
-resetbutton label =
+resetButton :: String -> HtmlExp
+resetButton label =
     HtmlStruct "input" [("type","reset"),("value",htmlQuote label)] []
 
 --- Submit button in form of an imag.
@@ -743,13 +604,16 @@ resetbutton label =
 --- @param handler - event handler
 imageButton :: String -> HtmlHandler -> HtmlExp
 imageButton src handler
+  | cref =:= CgiRef ref -- instantiate cref argument
   = HtmlEvent
-       (HtmlStruct "input" [("type","image"),("name","EVENT"),("src",src)] [])
-       handler
+       (HtmlStruct "input" [("type","image"),("name",ref),("src",src)] [])
+       cref handler
+ where
+  cref,ref free
 
 --- Input text field with a reference and an initial contents
-textfield :: CgiRef -> String -> HtmlExp
-textfield cref contents
+textField :: CgiRef -> String -> HtmlExp
+textField cref contents
   | cref =:= CgiRef ref -- instantiate cref argument
   = HtmlCRef
        (HtmlStruct "input" [("type","text"),("name",ref),
@@ -768,8 +632,8 @@ password cref
    ref free
 
 --- Input text area with a reference, height/width, and initial contents
-textarea :: CgiRef -> (Int,Int) -> String -> HtmlExp
-textarea cref (height,width) contents
+textArea :: CgiRef -> (Int,Int) -> String -> HtmlExp
+textArea cref (height,width) contents
   | cref =:= CgiRef ref -- instantiate cref argument
   = HtmlCRef
        (HtmlStruct "textarea" [("name",ref),
@@ -781,8 +645,8 @@ textarea cref (height,width) contents
 
 --- A checkbox with a reference and a value.
 --- The value is returned if checkbox is on, otherwise "" is returned.
-checkbox :: CgiRef -> String -> HtmlExp
-checkbox cref value
+checkBox :: CgiRef -> String -> HtmlExp
+checkBox cref value
   | cref =:= CgiRef ref -- instantiate cref argument
   = HtmlCRef
        (HtmlStruct "input" [("type","checkbox"),("name",ref),
@@ -793,8 +657,8 @@ checkbox cref value
 
 --- A checkbox that is initially checked with a reference and a value.
 --- The value is returned if checkbox is on, otherwise "" is returned.
-checkedbox :: CgiRef -> String -> HtmlExp
-checkedbox cref value
+checkedBox :: CgiRef -> String -> HtmlExp
+checkedBox cref value
   | cref =:= CgiRef ref -- instantiate cref argument
   = HtmlCRef
        (HtmlStruct "input" [("type","checkbox"),("name",ref),
@@ -812,8 +676,8 @@ checkedbox cref value
 --- The user can select another button but always at most one button
 --- of the radio can be selected. The value corresponding to the
 --- selected button is returned in the environment for this radio reference.
-radio_main :: CgiRef -> String -> HtmlExp
-radio_main cref value
+radioMain :: CgiRef -> String -> HtmlExp
+radioMain cref value
   | cref =:= CgiRef ref -- instantiate cref argument
   = HtmlCRef
        (HtmlStruct "input" [("type","radio"),("name",ref),
@@ -824,8 +688,8 @@ radio_main cref value
 
 --- A main button of a radio (initially "off") with a reference and a value.
 --- The value is returned of this button is on.
-radio_main_off :: CgiRef -> String -> HtmlExp
-radio_main_off cref value
+radioMainOff :: CgiRef -> String -> HtmlExp
+radioMainOff cref value
   | cref =:= CgiRef ref -- instantiate cref argument
   = HtmlCRef
        (HtmlStruct "input" [("type","radio"),("name",ref),
@@ -837,8 +701,8 @@ radio_main_off cref value
 --- A further button of a radio (initially "off") with a reference (identical
 --- to the main button of this radio) and a value.
 --- The value is returned of this button is on.
-radio_other :: CgiRef -> String -> HtmlExp
-radio_other cref value
+radioOther :: CgiRef -> String -> HtmlExp
+radioOther cref value
   | cref =:= CgiRef ref -- instantiate cref argument
   = HtmlStruct "input"
                [("type","radio"),("name",ref),("value",htmlQuote value)] []
@@ -951,13 +815,12 @@ addAttr hexp attr = addAttrs hexp [attr]
 addAttrs :: HtmlExp -> [(String,String)] -> HtmlExp
 addAttrs (HtmlText s) _ = HtmlText s  -- strings have no attributes
 addAttrs (HtmlStruct tag attrs hexps) newattrs =
-    HtmlStruct tag (attrs++newattrs) hexps
-addAttrs (HtmlEvent hexp handler) attrs =
-    HtmlEvent (addAttrs hexp attrs) handler
-addAttrs (HtmlRefEvent hexp cref handler) attrs =
-    HtmlRefEvent (addAttrs hexp attrs) cref handler
+    HtmlStruct tag (attrs ++ newattrs) hexps
+addAttrs (HtmlEvent hexp cref handler) attrs =
+    HtmlEvent (addAttrs hexp attrs) cref handler
 addAttrs (HtmlCRef  hexp cref) attrs =
     HtmlCRef (addAttrs hexp attrs) cref
+addAttrs (HtmlAction act) _ = HtmlAction act
 
 --- Adds a class attribute to an HTML element.
 addClass :: HtmlExp -> String -> HtmlExp
@@ -988,19 +851,19 @@ showHtmlExps hexps = showsHtmlExps 0 hexps ""
 
 -- get the string contents of an HTML expression:
 getText :: HtmlExp -> String
-getText (HtmlText     s)      = s
-getText (HtmlStruct   _ _ _)  = ""
-getText (HtmlEvent    he _)   = getText he
-getText (HtmlRefEvent he _ _) = getText he
-getText (HtmlCRef     he _)   = getText he
+getText (HtmlText   s)      = s
+getText (HtmlStruct _ _ _)  = ""
+getText (HtmlEvent  he _ _) = getText he
+getText (HtmlCRef   he _)   = getText he
+getText (HtmlAction _)      = ""
 
 -- get the (last) tag of an HTML expression:
 getTag :: HtmlExp -> String
-getTag (HtmlText     _)       = ""
-getTag (HtmlStruct   tag _ _) = tag
-getTag (HtmlEvent    he _)    = getTag he
-getTag (HtmlRefEvent he _ _)  = getTag he
-getTag (HtmlCRef     he _)    = getTag he
+getTag (HtmlText   _)       = ""
+getTag (HtmlStruct tag _ _) = tag
+getTag (HtmlEvent  he _ _)  = getTag he
+getTag (HtmlCRef   he _)    = getTag he
+getTag (HtmlAction  _)      = ""
 
 -- is this a tag where a line break can be safely added?
 tagWithLn :: String -> Bool
@@ -1032,9 +895,10 @@ showsHtmlExp i (HtmlStruct tag attrs hexps) =
  where
   showExps = if tag=="pre"
              then concatS . map (showsHtmlExp 0) else showsHtmlExps (i+2)
-showsHtmlExp i (HtmlEvent    hexp _)   = showsHtmlExp i hexp
-showsHtmlExp i (HtmlRefEvent hexp _ _) = showsHtmlExp i hexp
-showsHtmlExp i (HtmlCRef     hexp _)   = showsHtmlExp i hexp
+showsHtmlExp i (HtmlEvent hexp _ _) = showsHtmlExp i hexp
+showsHtmlExp i (HtmlCRef  hexp _)   = showsHtmlExp i hexp
+showsHtmlExp _ (HtmlAction  _)      =
+  error "HTML.Base.showsHtmlExp: HtmlAction occurred"
 
 showsHtmlExps :: Int -> [HtmlExp] -> ShowS
 showsHtmlExps _ [] = id
@@ -1067,6 +931,8 @@ showsHtmlOpenTag tag attrs close =
 --- @param page - the HTML page
 --- @return string representation of the HTML document
 showHtmlPage :: HtmlPage -> String
+showHtmlPage (HtmlAnswer _ _) =
+  error "HTML.Base.showHtmlPage: cannot show HtmlAnswer"
 showHtmlPage (HtmlPage title params html) =
   htmlPrelude ++
   showHtmlExp (HtmlStruct "html" htmlTagAttrs
@@ -1086,6 +952,7 @@ showHtmlPage (HtmlPage title params html) =
      [HtmlStruct "script" [("type","text/javascript"),("src",js)] []]
   param2html (PageMeta attrs) = [HtmlStruct "meta" attrs []]
   param2html (PageLink attrs) = [HtmlStruct "link" attrs []]
+  param2html (PageHeadInclude hexp) = [hexp]
   param2html (PageBodyAttr _) = [] -- these attributes are separately processed
 
   bodyattrs = [attr | (PageBodyAttr attr) <- params]

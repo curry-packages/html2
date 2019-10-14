@@ -15,14 +15,14 @@ guessNr :: Global (SessionStore Int)
 guessNr = global emptySessionStore (Persistent "guessNr")
 
 guessInputForm :: HtmlFormDef Int
-guessInputForm = HtmlFormDef "Guess.guessInputForm" readGuesses formHtml
+guessInputForm = formDefWithID "Guess.guessInputForm" readGuesses formHtml
  where
   readGuesses = getSessionData guessNr 0 -- read session data
 
   formHtml n =
     (if n>0 then [h4 [htxt $ show (n+1) ++ ". attempt:"]] else []) ++
-    [htxt "Guess a natural number: ", textfield nref "",
-     formButton "Check" guessHandler]
+    [htxt "Guess a natural number: ", textField nref "",
+     button "Check" guessHandler]
    where
     nref free
 
@@ -42,11 +42,8 @@ guessInputForm = HtmlFormDef "Guess.guessInputForm" readGuesses formHtml
 
 -- main HTML page containing the form
 main :: IO HtmlPage
-main = do
-  cookie <- sessionCookie  -- be sure that there is a cookie for the session
-  putSessionData guessNr 0  -- initialize session state
-  return (standardPage "Number Guessing Game"
-    [ formExp guessInputForm ] `addPageParam` cookie)
+main = withSessionCookieInfo $
+  standardPage "Number Guessing Game" [ formExp guessInputForm ]
 
 -- Install the CGI script in user homepage by:
 -- > cypm exec curry2cgi -o ~/public_html/cgi-bin/guess.cgi Guess
