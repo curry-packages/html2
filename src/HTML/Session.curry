@@ -99,10 +99,8 @@ withSessionCookie p = do
 withSessionCookieInfo :: HtmlPage -> IO HtmlPage
 withSessionCookieInfo p = do
   hassession <- doesSessionExist
-  if hassession
-    then do cookie <- sessionCookie
-            return $ (p `addPageParam` cookie)
-    else cookieInfoPage
+  if hassession then withSessionCookie p
+                else cookieInfoPage
 
 -- Returns HTML page with information about the use of cookies.
 cookieInfoPage :: IO HtmlPage
