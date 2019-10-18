@@ -13,6 +13,21 @@ the form and a result page shown after submitting the form.
 To implement the event handlers inside a form without a process,
 the read IO action is executed again when a form is submitted.
 
+All operations and smart constructors to implement
+interactive web pages are defined in the library `HTML.Base`.
+A form inside a web page must be defined as a
+**public top-level operation** of type `HtmlFormDef`, like
+
+    myForm :: HtmlFormDef String
+    myForm = formDefWithID "Module.myForm" readData viewData
+
+The first argument of a form definition is the qualified name
+of the operation (this will be checked by `curry2cgi`).
+The second argument is an IO action to read some data
+used in the form, and the third argument is the actual view
+of the form which usually contains buttons with event handlers
+that are invoked when a form is submitted.
+
 Some simple examples for dynamic web pages can be found in the
 directory `examples`.
 

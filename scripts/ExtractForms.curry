@@ -43,7 +43,7 @@ extractFormOps prog =
                               (filter hasFormDefType (functions prog))
   in (map funcName fds1, map funcName fds2)
  where
-  hasFormDefType fdecl = case resultType (typeOfQualType (funcType fdecl)) of
+  hasFormDefType fdecl = case typeOfQualType (funcType fdecl) of
     CTApply (CTCons tc) _ -> tc == ("HTML.Base","HtmlFormDef")
     _                     -> False
 
