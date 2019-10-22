@@ -32,14 +32,14 @@ module HTML.Base
    getCookies,
    page,standardPage,
    pageEnc, pageCookie, pageCSS, pageMetaInfo,
-   pageLinkInfo, pageBodyAttr, addPageParam, addCookies, addHeader,
+   pageLinkInfo, pageBodyAttr, addPageParam, addCookies, addHttpHeader,
    htxt,htxts,hempty,nbsp,h1,h2,h3,h4,h5,
    par,section,header,footer,emphasize,strong,bold,italic,nav,code,
    center,blink,teletype,pre,verbatim,address,href,anchor,
    ulist,olist,litem,dlist,table,headedTable,addHeadings,
    hrule,breakline,image,
    styleSheet,style,textstyle,blockstyle,inline,block,
-   redirect,expires,
+   redirectPage,expires,
    formExp,
    button,resetButton,imageButton,coordinates,
    textField,password,textArea,checkBox,checkedBox,
@@ -193,7 +193,7 @@ data HtmlPage = HtmlPage String [PageParam] [HtmlExp]
 --- @cons PageCookie name value params - a cookie to be sent to the
 ---                                      client's browser
 --- @cons PageCSS s - a URL for a CSS file for this page
---- @cons PageHeader key value - additional HTTP header to be included
+--- @cons HttpHeader key value - additional HTTP header included in this page
 --- @cons PageJScript s - a URL for a Javascript file for this page
 --- @cons PageMeta as - meta information (in form of attributes) for this page
 --- @cons PageLink as - link information (in form of attributes) for this page
@@ -203,7 +203,7 @@ data HtmlPage = HtmlPage String [PageParam] [HtmlExp]
 data PageParam = PageEnc         String
                | PageCookie      String String [CookieParam]
                | PageCSS         String
-               | PageHeader      String String
+               | HttpHeader      String String
                | PageJScript     String
                | PageMeta        [(String,String)]
                | PageLink        [(String,String)]
@@ -225,8 +225,8 @@ pageCSS css = PageCSS css
 
 --- A header to be sent to the client's browser when a HTML page is
 --- requested.
-pageHeader :: String -> String -> PageParam
-pageHeader k v = PageHeader k v
+httpHeader :: String -> String -> PageParam
+httpHeader k v = HttpHeader k v
 
 --- Meta information for a HTML page. The argument is a list of
 --- attributes included in the `meta`-tag in the header for this page.
@@ -279,16 +279,17 @@ addCookies cs (HtmlPage title params hexps) =
 addCookies _ (HtmlAnswer _ _) =
   error "addCookies: cannot add cookie to HTML answer"
 
---- Add a header to HTML page.
---- Headers are sent to the client's browser together with this page.
---- @param key - the cookies as a list of name/value pairs
---- @param page - the page to add cookies to
+--- Add a HTTP header to a HTML page.
+--- Headers are sent to the client's browser together with the page.
+--- @param key   - the name of the HTTP header field
+--- @param value - the value of the HTTP header field
+--- @param page  - the page to which the header is added
 --- @return a new HTML page
-addHeader :: String -> String -> HtmlPage -> HtmlPage
-addHeader key value (HtmlPage t fas hs) =
-  HtmlPage t (PageHeader key value : fas) hs
-addHeader _ _ (HtmlAnswer _ _) =
-  error "addHeader: cannot add header to Html answer"
+addHttpHeader :: String -> String -> HtmlPage -> HtmlPage
+addHttpHeader key value (HtmlPage t fas hs) =
+  HtmlPage t (HttpHeader key value : fas) hs
+addHttpHeader _ _ (HtmlAnswer _ _) =
+  error "addHttpHeader: cannot add HTTP header to HTML answer"
 
 ------------------------------------------------------------------------------
 --- The possible parameters of a cookie.
@@ -334,16 +335,11 @@ answerText = HtmlAnswer "text/plain"
 answerEncText :: String -> String -> HtmlPage
 answerEncText enc = HtmlAnswer ("text/plain; charset="++enc)
 
---- Adds redirection to given HTML page.
---- @param secs - Number of seconds to wait before executing autromatic redirection
---- @param url - The URL whereto redirect to
---- @param page - The page to add the header information to
-redirect :: Int -> String -> HtmlPage -> HtmlPage
-redirect secs url hpage =
-  hpage `addPageParam`
-    PageHeadInclude
-      (HtmlStruct "meta" [("http-equiv","refresh"),
-                          ("content",show secs++"; URL="++url)] [])
+--- Generates a redirection page to a given URL.
+--- @param url - The URL target of the redirection
+--- @param page - The redirection page
+redirectPage :: String -> HtmlPage
+redirectPage url = addHttpHeader "Location" url $ page "Redirect" []
 
 --- Adds expire time to given HTML page.
 --- @param secs - Number of seconds before document expires
@@ -966,7 +962,7 @@ showHtmlPage (HtmlPage title params html) =
   param2html (PageCSS css) =
      [HtmlStruct "link" [("rel","stylesheet"),("type","text/css"),("href",css)]
                  []]
-  param2html (PageHeader _ _) = [] -- page headers are differently processed
+  param2html (HttpHeader _ _) = [] -- page headers are differently processed
   param2html (PageJScript js) =
      [HtmlStruct "script" [("type","text/javascript"),("src",js)] []]
   param2html (PageMeta attrs) = [HtmlStruct "meta" attrs []]

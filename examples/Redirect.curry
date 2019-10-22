@@ -1,6 +1,6 @@
 ------------------------------------------------------------------------------
 -- Example for a form to redirect to another URL typed in a text input field.
--- The example exploits the HTTP head field `Location` for redirection.
+-- The example exploits the HTTP header field `Location` for redirection.
 ------------------------------------------------------------------------------
 
 import HTML.Base
@@ -12,13 +12,10 @@ redirectForm = formDefWithID "Redirect.redirectForm" (return "") formHtml
   formHtml _ =
     [ htxt "Enter a URL: ", textField ref "http://www.google.com"
     , hrule
-    , button "Go to the URL" redirectHandler
+    , button "Go to the URL" (\env -> return $ redirectPage (env ref))
     ]
    where
     ref free
-
-    redirectHandler env =
-      return $ addHeader "Location" (env ref) $ page "Answer" []
 
 -- main HTML page containing the form
 main :: IO HtmlPage

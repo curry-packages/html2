@@ -103,7 +103,7 @@ extractHeader (HtmlPage title params hexp) =
     let (hs,cs,ops) = splitPageParams fps
     in case fparam of
          PageCookie n v ps -> (hs, (n,v,ps) : cs, ops)
-         PageHeader k v    -> ((k ++ ": " ++ v):hs, cs, ops)
+         HttpHeader k v    -> ((k ++ ": " ++ v):hs, cs, ops)
          _                 -> (hs, cs, fparam:ops)
 
 
