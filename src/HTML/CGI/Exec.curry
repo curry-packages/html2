@@ -77,29 +77,34 @@ printPage (HtmlAnswer ctype cont) = do
   putStrLn $ "Content-Length: " ++ show (length cont) ++
              "\nContent-Type: " ++ ctype ++ "\n\n" ++ cont
 printPage p@(HtmlPage _ _ _) = do
-  let (cookiestring,hpage) = extractCookies p
-  putStrLn $ cookiestring ++
+  let (headerstring,hpage) = extractHeader p
+  putStrLn $ headerstring ++
              "Content-type: text/html\n\n" ++ showHtmlPage hpage
 
--- Extract the cookies contained in a HTML page and return the
--- "set cookie" string and the HTML page without the cookies:
-extractCookies :: HtmlPage -> (String,HtmlPage)
-extractCookies (HtmlAnswer ctype cont) = ("", HtmlAnswer ctype cont)
-extractCookies (HtmlPage title params hexp) =
-  let cookiestring = if null cookies
-                     then ""
-                     else "Cache-control: no-cache=\"set-cookie\"\n" ++
-                          concatMap ((++"\n") . formatCookie) cookies
-   in (cookiestring, HtmlPage title otherparams hexp)
- where
-   (cookies,otherparams) = splitFormParams params
+-- Extract the headers contained in a form as well as the cookies
+-- and return a string for the HTTP header of the page
+-- if any cookie is set, also return the cache-control header
+extractHeader :: HtmlPage -> (String, HtmlPage)
+extractHeader (HtmlAnswer ctype cont) = ("",HtmlAnswer ctype cont)
+extractHeader (HtmlPage title params hexp) = 
+  (headerstring ++ cookiestring, HtmlPage title otherparams hexp)
+ where 
+  headerstring = concatMap (++"\n") headers
 
-   splitFormParams []           = ([],[])
-   splitFormParams (fparam:fps) =
-     let (cs,ops) = splitFormParams fps
-      in case fparam of
-           PageCookie n v ps -> ((n,v,ps) : cs, ops)
-           _                 -> (cs, fparam:ops)
+  cookiestring = if null cookies
+                   then ""
+                   else "Cache-control: no-cache=\"set-cookie\"\n" ++
+                        concatMap ((++"\n") . formatCookie) cookies
+
+  (headers, cookies, otherparams) = splitPageParams params
+
+  splitPageParams []           = ([],[],[])
+  splitPageParams (fparam:fps) =
+    let (hs,cs,ops) = splitPageParams fps
+    in case fparam of
+         PageCookie n v ps -> (hs, (n,v,ps) : cs, ops)
+         PageHeader k v    -> ((k ++ ": " ++ v):hs, cs, ops)
+         _                 -> (hs, cs, fparam:ops)
 
 
 -- Generates HTML page to show in illegal invocation of a form.

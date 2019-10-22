@@ -32,7 +32,7 @@ module HTML.Base
    getCookies,
    page,standardPage,
    pageEnc, pageCookie, pageCSS, pageMetaInfo,
-   pageLinkInfo, pageBodyAttr, addPageParam, addPageCookies,
+   pageLinkInfo, pageBodyAttr, addPageParam, addCookies, addHeader,
    htxt,htxts,hempty,nbsp,h1,h2,h3,h4,h5,
    par,section,header,footer,emphasize,strong,bold,italic,nav,code,
    center,blink,teletype,pre,verbatim,address,href,anchor,
@@ -193,6 +193,7 @@ data HtmlPage = HtmlPage String [PageParam] [HtmlExp]
 --- @cons PageCookie name value params - a cookie to be sent to the
 ---                                      client's browser
 --- @cons PageCSS s - a URL for a CSS file for this page
+--- @cons PageHeader key value - additional HTTP header to be included
 --- @cons PageJScript s - a URL for a Javascript file for this page
 --- @cons PageMeta as - meta information (in form of attributes) for this page
 --- @cons PageLink as - link information (in form of attributes) for this page
@@ -202,6 +203,7 @@ data HtmlPage = HtmlPage String [PageParam] [HtmlExp]
 data PageParam = PageEnc         String
                | PageCookie      String String [CookieParam]
                | PageCSS         String
+               | PageHeader      String String
                | PageJScript     String
                | PageMeta        [(String,String)]
                | PageLink        [(String,String)]
@@ -220,6 +222,11 @@ pageCookie (n,v) = PageCookie n v []
 --- A URL for a CSS file for a HTML page.
 pageCSS :: String -> PageParam
 pageCSS css = PageCSS css
+
+--- A header to be sent to the client's browser when a HTML page is
+--- requested.
+pageHeader :: String -> String -> PageParam
+pageHeader k v = PageHeader k v
 
 --- Meta information for a HTML page. The argument is a list of
 --- attributes included in the `meta`-tag in the header for this page.
@@ -253,7 +260,7 @@ standardPage :: String -> [HtmlExp] -> HtmlPage
 standardPage title hexps = page title (h1 [htxt title] : hexps)
 
 --- Adds a parameter to an HTML page.
---- @param form - a page
+--- @param page - a page
 --- @param param - a page's parameter
 --- @return an HTML page
 addPageParam :: HtmlPage -> PageParam -> HtmlPage
@@ -266,11 +273,22 @@ addPageParam hexp@(HtmlAnswer _ _) _ = hexp
 --- @param cs - the cookies as a list of name/value pairs
 --- @param form - the form to add cookies to
 --- @return a new HTML page
-addPageCookies :: [(String,String)] -> HtmlPage -> HtmlPage
-addPageCookies cs (HtmlPage title params hexps) =
+addCookies :: [(String,String)] -> HtmlPage -> HtmlPage
+addCookies cs (HtmlPage title params hexps) =
   HtmlPage title (map pageCookie cs ++ params) hexps
-addPageCookies _ (HtmlAnswer _ _) =
-  error "addPageCookies: cannot add cookie to HTML answer"
+addCookies _ (HtmlAnswer _ _) =
+  error "addCookies: cannot add cookie to HTML answer"
+
+--- Add a header to HTML page.
+--- Headers are sent to the client's browser together with this page.
+--- @param key - the cookies as a list of name/value pairs
+--- @param page - the page to add cookies to
+--- @return a new HTML page
+addHeader :: String -> String -> HtmlPage -> HtmlPage
+addHeader key value (HtmlPage t fas hs) =
+  HtmlPage t (PageHeader key value : fas) hs
+addHeader _ _ (HtmlAnswer _ _) =
+  error "addHeader: cannot add header to Html answer"
 
 ------------------------------------------------------------------------------
 --- The possible parameters of a cookie.
@@ -948,6 +966,7 @@ showHtmlPage (HtmlPage title params html) =
   param2html (PageCSS css) =
      [HtmlStruct "link" [("rel","stylesheet"),("type","text/css"),("href",css)]
                  []]
+  param2html (PageHeader _ _) = [] -- page headers are differently processed
   param2html (PageJScript js) =
      [HtmlStruct "script" [("type","text/javascript"),("src",js)] []]
   param2html (PageMeta attrs) = [HtmlStruct "meta" attrs []]
