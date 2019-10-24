@@ -336,6 +336,8 @@ answerEncText :: String -> String -> HtmlPage
 answerEncText enc = HtmlAnswer ("text/plain; charset="++enc)
 
 --- Generates a redirection page to a given URL.
+--- This is implemented via the HTTP response header `Location` (see also
+--- <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Location>).
 --- @param url - The URL target of the redirection
 --- @param page - The redirection page
 redirectPage :: String -> HtmlPage
@@ -945,9 +947,8 @@ showsHtmlOpenTag tag attrs close =
 --- @param page - the HTML page
 --- @return string representation of the HTML document
 showHtmlPage :: HtmlPage -> String
-showHtmlPage (HtmlAnswer _ _) =
-  error "HTML.Base.showHtmlPage: cannot show HtmlAnswer"
-showHtmlPage (HtmlPage title params html) =
+showHtmlPage (HtmlAnswer _ cont)            = cont
+showHtmlPage (HtmlPage   title params html) =
   htmlPrelude ++
   showHtmlExp (HtmlStruct "html" htmlTagAttrs
                   [HtmlStruct "head" []

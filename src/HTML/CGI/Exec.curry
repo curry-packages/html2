@@ -74,8 +74,8 @@ catchFormErrors formact = catch formact showFormError
 --- Shows a HTML page on stdout.
 printPage :: HtmlPage -> IO ()
 printPage (HtmlAnswer ctype cont) = do
-  putStrLn $ "Content-Length: " ++ show (length cont) ++
-             "\nContent-Type: " ++ ctype ++ "\n\n" ++ cont
+  putStr $ "Content-Length: " ++ show (length cont) ++
+           "\nContent-Type: " ++ ctype ++ "\n\n" ++ cont
 printPage p@(HtmlPage _ _ _) = do
   let (headerstring,hpage) = extractHeader p
   putStrLn $ headerstring ++
