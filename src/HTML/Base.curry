@@ -45,7 +45,7 @@ module HTML.Base
    textField,password,textArea,checkBox,checkedBox,
    radioMain,radioMainOff,radioOther,
    selection,selectionInitial,multipleSelection,
-   hiddenfield,htmlQuote,htmlIsoUmlauts,addAttr,addAttrs,addClass,
+   hiddenField,htmlQuote,htmlIsoUmlauts,addAttr,addAttrs,addClass,
    showHtmlExps,showHtmlExp,showHtmlPage,
    htmlPrelude, htmlTagAttrs,
    getUrlParameter,urlencoded2string,string2urlencoded,
@@ -787,11 +787,6 @@ multipleSelection cref sellist
 hiddenField :: String -> String -> HtmlExp
 hiddenField name value =
     HtmlStruct "input" [("type","hidden"),("name",name),("value",value)] []
-
---- A hidden field to pass a value referenced by a fixed name.
---- Deprecated, use `hiddenField`.
-hiddenfield :: String -> String -> HtmlExp
-hiddenfield = hiddenField
 
 
 ------------------------------------------------------------------------------
