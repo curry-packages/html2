@@ -10,6 +10,7 @@ module HTML.Styles.Bootstrap3
  ( bootstrapPage, titledSideMenu
  , defaultButton, smallButton, primButton
  , hrefDefaultButton, hrefSmallButton, hrefPrimButton
+ , hrefInfoButton, hrefSuccessButton, hrefWarningButton, hrefDangerButton
  , hrefButton, hrefBlock, hrefInfoBlock
  , glyphicon, homeIcon, userIcon, loginIcon, logoutIcon
  ) where
@@ -153,6 +154,26 @@ hrefButton = hrefSmallButton
 hrefPrimButton :: String -> [HtmlExp] -> HtmlExp
 hrefPrimButton ref hexps =
   href ref hexps `addClass` "btn btn-primary"
+
+--- Hypertext reference rendered as an info button.
+hrefInfoButton :: String -> [HtmlExp] -> HtmlExp
+hrefInfoButton ref hexps =
+  href ref hexps `addClass` "btn btn-info"
+
+--- Hypertext reference rendered as a success button.
+hrefSuccessButton :: String -> [HtmlExp] -> HtmlExp
+hrefSuccessButton ref hexps =
+  href ref hexps `addClass` "btn btn-success"
+
+--- Hypertext reference rendered as a warning button.
+hrefWarningButton :: String -> [HtmlExp] -> HtmlExp
+hrefWarningButton ref hexps =
+  href ref hexps `addClass` "btn btn-warning"
+
+--- Hypertext reference rendered as a danger button.
+hrefDangerButton :: String -> [HtmlExp] -> HtmlExp
+hrefDangerButton ref hexps =
+  href ref hexps `addClass` "btn btn-danger"
 
 --- Hypertext reference rendered as a block level button.
 hrefBlock :: String -> [HtmlExp] -> HtmlExp
