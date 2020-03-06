@@ -36,6 +36,9 @@ logic variables in the source programs, are sequentially numbered
 when a form is generated. This allows a simple identification
 of the corresponding values submitted by the client.
 
+curry2cgi
+---------
+
 The auxiliary program `curry2cgi` is used to transform a
 Curry program containing forms into an executable.
 `curry2cgi` collects all operations defining forms in a program
@@ -56,3 +59,11 @@ to be compiled. Thus, the operation `HTML.CGI.Exec.printMainPage`
 is responsible to generate the initial HTML page or, if a form
 is submitted, invoke the corresponding event handler defined
 in the form.
+
+If some imported modules also contain HTML forms, the names
+of these imported modules must be passed to `curry2cgi`
+(via the option `--include`) so that their names are known
+to the generated main program. In this case, `curry2cgi` also
+collects the forms in the provided imported modules.
+To speed up this process for larger applications, `curry2cgi`
+caches the form names of a module `M` in file `.curry/M.htmlforms`.

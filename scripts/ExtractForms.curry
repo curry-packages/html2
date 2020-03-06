@@ -2,26 +2,52 @@
 --- Compute infos about all `HtmlFormDef` operations occurring in a module.
 ---
 --- @author Michael Hanus
---- @version October 2019
+--- @version March 2020
 ------------------------------------------------------------------------------
 
 module ExtractForms ( extractFormsInProg, showQName )
  where
 
-import FilePath     ( (</>) )
+import Directory    ( doesFileExist, getModificationTime )
+import FilePath     ( (</>), (<.>) )
 import List         ( intercalate, partition )
 import System       ( exitWith, getArgs, getPID, system )
 
 import AbstractCurry.Files
 import AbstractCurry.Select
 import AbstractCurry.Types
-import HTML.Base
-import System.CurryPath  ( stripCurrySuffix )
+import System.CurryPath  ( inCurrySubdir, lookupModuleSourceInLoadPath
+                         , stripCurrySuffix )
 
---- Extract and check all forms defined in a Curry module (their argument).
+-- The cache file for storing qualified form names of a module w.r.t.
+-- a directory.
+formCacheFile :: String -> String -> String
+formCacheFile mdir mname = inCurrySubdir (mdir </> mname) <.> "htmlforms"
+
+--- Extract and check all forms defined in a Curry module (third argument).
 --- Returns the qualified names of the exported forms.
 extractFormsInProg :: Int -> String -> String -> IO [QName]
-extractFormsInProg verb curryroot mname = do
+extractFormsInProg verb curryroot mname =
+  lookupModuleSourceInLoadPath mname >>=
+  maybe (error $ "Module '" ++ mname ++ "' not found in load path!")
+        extractWithFormCache
+ where
+  extractWithFormCache (mdir,mfile) = do
+    let formfile = formCacheFile mdir mname
+    ffexists <- doesFileExist formfile
+    if not ffexists
+      then readFormsInProg verb curryroot mname formfile
+      else do
+        ctime <- getModificationTime mfile
+        ftime <- getModificationTime formfile
+        if ctime>ftime
+          then readFormsInProg verb curryroot mname formfile
+          else do
+            when (verb>1) $ putStrLn $ "Reading file '" ++ formfile ++ "'"
+            readFile formfile >>= return . read
+
+readFormsInProg :: Int -> String -> String -> String -> IO [QName]
+readFormsInProg verb curryroot mname formfile = do
   unless (verb==0) $ putStrLn $
     "Extracting and checking forms contained in module '" ++ mname ++ "'..."
   when (verb>1) $ putStr $ "Reading module '" ++ mname ++ "'..."
@@ -31,9 +57,12 @@ extractFormsInProg verb curryroot mname = do
   unless (null privatenames) $ putStrLn $
     "WARNING: Private form operations found (and not translated):\n" ++
     unwords (map snd privatenames)
-  unless (verb==0) $ putStrLn $
+  unless (verb==0 || null formnames) $ putStrLn $
     "Form operations found: " ++ unwords (map snd formnames)
   unless (null formnames) $ checkFormIDsInProg verb curryroot mname formnames
+  when (verb>1) $ putStrLn $ "Writing form names to '" ++ formfile ++ "'"
+  -- store form names in form cache file:
+  catch (writeFile formfile (show formnames)) (const done)
   return formnames
 
 --- Extract public and private form definitions from a program.

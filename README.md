@@ -21,7 +21,7 @@ A form inside a web page must be defined as a
     myForm :: HtmlFormDef String
     myForm = formDefWithID "Module.myForm" readData viewData
 
-The first argument of a form definition is the qualified name
+The first argument of a form definition must be the qualified name
 of the operation (this will be checked by `curry2cgi`).
 The second argument is an IO action to read some data
 used in the form, and the third argument is the actual view

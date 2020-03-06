@@ -26,6 +26,15 @@ import System.CurryPath    ( stripCurrySuffix )
 
 import ExtractForms        ( extractFormsInProg, showQName )
 
+------------------------------------------------------------------------
+
+banner :: String
+banner = unlines [bannerLine,bannerText,bannerLine]
+ where
+  bannerText = "Compile Curry programs with HTML forms to CGI executables " ++
+               "(Version of 06/03/20)"
+  bannerLine = take (length bannerText) (repeat '=')
+
 main :: IO ()
 main = do
   args <- getArgs
@@ -169,7 +178,7 @@ processOptions argv = do
     []  -> error $ "Name of main module missing!"
     _   -> error $ "Please provide only one main module!"
  where
-  printUsage = putStrLn usageText
+  printUsage = putStrLn (banner ++ "\n" ++ usageText)
 
 -- Usage text
 usageText :: String
@@ -182,6 +191,9 @@ options =
   [ Option "h?" ["help"]
            (NoArg (\opts -> opts { optHelp = True }))
            "print help and exit"
+  , Option "q" ["quiet"]
+           (NoArg (\opts -> opts { optVerb = 0 }))
+           "run quietly (no output, only exit code)"
   , Option "v" ["verb"]
             (OptArg (maybe (checkVerb 2) (safeReadNat checkVerb)) "<n>")
             "verbosity level:\n0: quiet (same as `-q')\n1: show status messages (default)\n2: show intermediate results (same as `-v')\n3: show all details"
