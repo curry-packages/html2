@@ -28,28 +28,28 @@ module HTML.Base
    CookieParam(..),
    CgiRef, idOfCgiRef, instCgiRefs, CgiEnv, HtmlHandler,
    defaultEncoding,
-   answerText,answerEncText,
+   answerText, answerEncText,
    getCookies,
-   page,standardPage,
+   page, standardPage,
    pageEnc, pageCookie, pageCSS, pageMetaInfo,
    pageLinkInfo, pageBodyAttr, addPageParam, addCookies, addHttpHeader,
-   htxt,htxts,hempty,nbsp,h1,h2,h3,h4,h5,
-   par,section,header,footer,emphasize,strong,bold,italic,nav,code,
-   center,blink,teletype,pre,verbatim,address,href,anchor,
+   htxt, htxts, hempty, nbsp, h1, h2, h3, h4, h5,
+   par, section, header, footer, emphasize, strong, bold, italic, nav, code,
+   center, blink, teletype, pre, verbatim, address, href, anchor,
    ulist, ulistWithClass, olist, olistWithClass, litem, dlist,
    table, tableWithClass, headedTable, addHeadings,
-   hrule,breakline,image,
-   styleSheet,style,textstyle,blockstyle,inline,block,
-   redirectPage,expires,
+   hrule, breakline, image,
+   styleSheet, style, textstyle, blockstyle, inline, block,
+   redirectPage, expires,
    formExp,
-   button,resetButton,imageButton,coordinates,
-   textField,password,textArea,checkBox,checkedBox,
-   radioMain,radioMainOff,radioOther,
-   selection,selectionInitial,multipleSelection,
-   hiddenField,htmlQuote,htmlIsoUmlauts,addAttr,addAttrs,addClass,
-   showHtmlExps,showHtmlExp,showHtmlPage,
+   button, resetButton, imageButton, coordinates,
+   textField, password, textArea, checkBox, checkedBox,
+   radioMain, radioMainOff, radioOther,
+   selection, selectionInitial, multipleSelection,
+   hiddenField, htmlQuote, htmlIsoUmlauts, addAttr, addAttrs, addClass,
+   showHtmlExps, showHtmlExp, showHtmlPage,
    htmlPrelude, htmlTagAttrs,
-   getUrlParameter,urlencoded2string,string2urlencoded,
+   getUrlParameter, urlencoded2string, string2urlencoded,
    formatCookie
  ) where
 
@@ -940,13 +940,14 @@ showsHtmlExp i (HtmlStruct tag attrs hexps) =
   let maybeLn j = if tagWithLn tag then nl . showTab j else id
    in maybeLn i .
       (if null hexps && (null attrs || tag `elem` noEndTags)
-       then showsHtmlOpenTag tag attrs "/>"
-       else showsHtmlOpenTag tag attrs ">" . maybeLn (i+2) . showExps hexps .
-            maybeLn i . showString "</" . showString tag . showChar '>'
+         then showsHtmlOpenTag tag attrs "/>"
+         else showsHtmlOpenTag tag attrs ">" . maybeLn (i+2) . showExps hexps .
+              maybeLn i . showString "</" . showString tag . showChar '>'
       ) . maybeLn i
  where
   showExps = if tag=="pre"
-             then concatS . map (showsHtmlExp 0) else showsHtmlExps (i+2)
+               then concatS . map (showsHtmlExp 0)
+               else showsHtmlExps (i+2)
 showsHtmlExp i (HtmlEvent hexp _ _) = showsHtmlExp i hexp
 showsHtmlExp i (HtmlCRef  hexp _)   = showsHtmlExp i hexp
 showsHtmlExp _ (HtmlAction  _)      =
@@ -958,8 +959,8 @@ showsHtmlExps i (he:hes) = showsWithLnPrefix he . showsHtmlExps i hes
  where
    showsWithLnPrefix hexp = let s = getText hexp
                             in if s/="" && isSpace (head s)
-                               then nl . showTab i . showString (tail s)
-                               else showsHtmlExp i hexp
+                                 then nl . showTab i . showString (tail s)
+                                 else showsHtmlExp i hexp
 
 showTab :: Int -> String -> String
 showTab n = showString (take n (repeat ' '))
@@ -1064,23 +1065,25 @@ getCookies = do
 -- translate a string of cookies (of the form "NAME1=VAL1; NAME2=VAL")
 -- into a list of name/value pairs:
 parseCookies :: String -> [(String,String)]
-parseCookies str = if str=="" then [] else
-  let (c1,cs) = break (==';') str
-   in parseCookie c1 :
-      parseCookies (dropWhile (==' ') (if cs=="" then "" else tail cs))
+parseCookies str =
+  if null str
+    then []
+    else let (c1,cs) = break (==';') str
+         in parseCookie c1 :
+            parseCookies (dropWhile (==' ') (if cs=="" then "" else tail cs))
  where
   parseCookie s = let (name,evalue) = break (=='=') s in
-      (name,if evalue=="" then "" else urlencoded2string (tail evalue))
+      (name, if evalue=="" then "" else urlencoded2string (tail evalue))
 
 --- For image buttons: retrieve the coordinates where the user clicked
 --- within the image.
 coordinates :: CgiEnv -> Maybe (Int,Int)
 coordinates env = let x = env (CgiRef "x")
                       y = env (CgiRef "y")
-                   in if x/="" && y/=""
-                        then Just (tryReadNat 0 x, tryReadNat 0 y)
-                        else Nothing
+                  in if x/="" && y/=""
+                       then Just (tryReadNat 0 x, tryReadNat 0 y)
+                       else Nothing
  where
-  tryReadNat d s = maybe d (\(i,rs)->if null rs then i else d) (readNat s)
+  tryReadNat d s = maybe d (\ (i,rs) -> if null rs then i else d) (readNat s)
 
 ------------------------------------------------------------------------------
