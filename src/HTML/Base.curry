@@ -833,9 +833,11 @@ addAttrs (HtmlCRef  hexp cref) attrs =
     HtmlCRef (addAttrs hexp attrs) cref
 addAttrs (HtmlAction act) _ = HtmlAction act
 
---- Adds a class attribute to an HTML element.
+--- Adds a class attribute to an HTML element
+--- (if the class attribute is not empty).
 addClass :: HtmlExp -> String -> HtmlExp
-addClass hexp cls = addAttr hexp ("class",cls)
+addClass hexp cls | null cls  = hexp
+                  | otherwise = addAttr hexp ("class",cls)
 
 ------------------------------------------------------------------------------
 -- Auxiliaries for faster show (could be later put into a standard library)
