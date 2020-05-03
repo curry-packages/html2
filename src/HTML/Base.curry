@@ -36,7 +36,8 @@ module HTML.Base
    htxt,htxts,hempty,nbsp,h1,h2,h3,h4,h5,
    par,section,header,footer,emphasize,strong,bold,italic,nav,code,
    center,blink,teletype,pre,verbatim,address,href,anchor,
-   ulist,olist,litem,dlist,table,headedTable,addHeadings,
+   ulist, ulistWithClass, olist, olistWithClass, litem, dlist,
+   table, tableWithClass, headedTable, addHeadings,
    hrule,breakline,image,
    styleSheet,style,textstyle,blockstyle,inline,block,
    redirectPage,expires,
@@ -468,15 +469,37 @@ href ref hexps = HtmlStruct "a" [("href",ref)] hexps
 anchor           :: String -> [HtmlExp] -> HtmlExp
 anchor anc hexps = HtmlStruct "span" [("id",anc)] hexps
 
---- Unordered list
+--- Unordered list.
 --- @param items - the list items where each item is a list of HTML expressions
 ulist       :: [[HtmlExp]] -> HtmlExp
 ulist items = HtmlStruct "ul" [] (map litem items)
 
---- Ordered list
+--- An unordered list with classes for the entire list and the list elements.
+--- The class annotation will be ignored if it is empty.
+--- @param listclass - the class for the entire list structure
+--- @param itemclass - the class for the list items
+--- @param items - the list items where each item is a list of HTML expressions
+ulistWithClass :: String -> String -> [[HtmlExp]] -> HtmlExp
+ulistWithClass listclass itemclass items =
+  HtmlStruct "ul" [] (map litemWC items) `addClass` listclass
+ where
+  litemWC i = litem i `addClass` itemclass
+
+--- Ordered list.
 --- @param items - the list items where each item is a list of HTML expressions
 olist :: [[HtmlExp]] -> HtmlExp
 olist items = HtmlStruct "ol" [] (map litem items)
+
+--- An ordered list with classes for the entire list and the list elements.
+--- The class annotation will be ignored if it is empty.
+--- @param listclass - the class for the entire list structure
+--- @param itemclass - the class for the list items
+--- @param items - the list items where each item is a list of HTML expressions
+olistWithClass :: String -> String -> [[HtmlExp]] -> HtmlExp
+olistWithClass listclass itemclass items =
+  HtmlStruct "ol" [] (map litemWC items) `addClass` listclass
+ where
+  litemWC i = litem i `addClass` itemclass
 
 --- A single list item (usually not explicitly used)
 litem :: [HtmlExp] -> HtmlExp
@@ -487,14 +510,30 @@ litem hexps = HtmlStruct "li" [] hexps
 dlist       :: [([HtmlExp],[HtmlExp])] -> HtmlExp
 dlist items = HtmlStruct "dl" [] (concatMap ditem items)
  where
-   ditem (hexps1,hexps2) = [HtmlStruct "dt" [] hexps1,
-                            HtmlStruct "dd" [] hexps2]
+  ditem (hexps1,hexps2) = [HtmlStruct "dt" [] hexps1,
+                           HtmlStruct "dd" [] hexps2]
 
 --- Table with a matrix of items where each item is a list of HTML expressions.
 table :: [[[HtmlExp]]] -> HtmlExp
 table items = HtmlStruct "table" []
  (map (\row->HtmlStruct "tr" []
                  (map (\item -> HtmlStruct "td" [] item) row)) items)
+
+--- Table with a matrix of items (each item is a list of HTML expressions)
+--- with classes for the entire table, each row, and each data element.
+--- The class annotation will be ignored if it is empty.
+--- @param tableclass - the class for the entire table structure
+--- @param rowclass   - the class for the table rows
+--- @param dataclass  - the class for the table data items
+--- @param items - the matrix of table items where each item is a
+---                list of HTML expressions
+tableWithClass :: String -> String -> String -> [[[HtmlExp]]] -> HtmlExp
+tableWithClass tableclass rowclass dataclass items =
+ HtmlStruct "table" []
+   (map (\row -> HtmlStruct "tr" []
+                   (map (\d -> HtmlStruct "td" [] d `addClass` dataclass) row)
+                   `addClass` rowclass)
+        items) `addClass` tableclass
 
 --- Similar to <code>table</code> but introduces header tags for the first row.
 headedTable :: [[[HtmlExp]]] -> HtmlExp
