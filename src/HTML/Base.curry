@@ -16,7 +16,7 @@
 --- is the command calling the Curry Package Manager).
 ---
 --- @author Michael Hanus (with extensions by Bernd Brassel and Marco Comini)
---- @version October 2019
+--- @version May 2020
 ------------------------------------------------------------------------------
 
 {-# OPTIONS_CYMAKE -Wno-incomplete-patterns #-}
