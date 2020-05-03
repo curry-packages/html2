@@ -15,7 +15,7 @@
     "exportedModules": [ "HTML.Base",
                          "HTML.CategorizedList", "HTML.LaTeX",
                          "HTML.Parser", "HTML.Session",
-                         "HTML.Styles.Bootstrap3" ],
+                         "HTML.Styles.Bootstrap3", "HTML.Styles.Bootstrap4" ],
     "compilerCompatibility": {
         "pakcs": ">= 2.0.0",
         "kics2": ">= 2.0.0"
