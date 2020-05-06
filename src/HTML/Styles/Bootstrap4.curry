@@ -8,13 +8,17 @@
 
 module HTML.Styles.Bootstrap4
  ( bootstrapPage, titledSideMenu
- , primButton, primSmButton, scndButton, scndSmButton, infoButton, infoSmButton
+ , primButton, primSmButton, scndButton, scndSmButton
+ , infoButton, infoSmButton
  , hrefPrimButton, hrefPrimSmButton, hrefScndButton, hrefScndSmButton
- , hrefInfoButton, hrefSuccButton, hrefWarnButton, hrefDangerButton
+ , hrefInfoButton, hrefInfoSmButton, hrefSuccButton, hrefSuccSmButton
+ , hrefWarnButton, hrefWarnSmButton, hrefDangButton, hrefDangSmButton
  , hrefInfoBlock, hrefPrimSmBlock, hrefScndSmBlock
- , hrefPrimBadge, hrefScndBadge, hrefSuccBadge, hrefWarnBadge
- , ehrefPrimBadge, ehrefScndBadge, ehrefSuccBadge, ehrefWarnBadge
- , hrefNav, hrefNavActive, ehrefNav, ehref
+ , hrefPrimBadge, hrefScndBadge, hrefSuccBadge
+ , hrefInfoBadge, hrefWarnBadge, hrefDangBadge
+ , ehrefPrimBadge, ehrefScndBadge, ehrefSuccBadge
+ , ehrefInfoBadge, ehrefWarnBadge, ehrefDangBadge
+ , hrefNav, hrefNavActive, ehrefNav, ehref, eTarget
  , kbdInput
  ) where
 
@@ -114,7 +118,7 @@ topNavigationBar (brandurl,brandtitle) leftmenu rightmenu =
          then []
          else [ulistWithClass "navbar-nav navbar-right" "nav-item" rightmenu]]]
 
--- Create a side menu containing a title and a list of items:
+--- Create a side menu containing a title and a list of items:
 titledSideMenu :: String -> [[HtmlExp]] -> [HtmlExp]
 titledSideMenu title items =
   (if null title
@@ -183,20 +187,40 @@ hrefInfoButton :: String -> [HtmlExp] -> HtmlExp
 hrefInfoButton ref hexps =
   href ref hexps `addClass` "btn btn-info"
 
+--- Hypertext reference rendered as a secondary small button.
+hrefInfoSmButton :: String -> [HtmlExp] -> HtmlExp
+hrefInfoSmButton ref hexps =
+  href ref hexps `addClass` "btn btn-sm btn-info"
+
 --- Hypertext reference rendered as a success button.
 hrefSuccButton :: String -> [HtmlExp] -> HtmlExp
 hrefSuccButton ref hexps =
   href ref hexps `addClass` "btn btn-success"
+
+--- Hypertext reference rendered as a success button.
+hrefSuccSmButton :: String -> [HtmlExp] -> HtmlExp
+hrefSuccSmButton ref hexps =
+  href ref hexps `addClass` "btn btn-sm btn-success"
 
 --- Hypertext reference rendered as a warning button.
 hrefWarnButton :: String -> [HtmlExp] -> HtmlExp
 hrefWarnButton ref hexps =
   href ref hexps `addClass` "btn btn-warning"
 
+--- Hypertext reference rendered as a warning button.
+hrefWarnSmButton :: String -> [HtmlExp] -> HtmlExp
+hrefWarnSmButton ref hexps =
+  href ref hexps `addClass` "btn btn-sm btn-warning"
+
 --- Hypertext reference rendered as a danger button.
-hrefDangerButton :: String -> [HtmlExp] -> HtmlExp
-hrefDangerButton ref hexps =
+hrefDangButton :: String -> [HtmlExp] -> HtmlExp
+hrefDangButton ref hexps =
   href ref hexps `addClass` "btn btn-danger"
+
+--- Hypertext reference rendered as a danger button.
+hrefDangSmButton :: String -> [HtmlExp] -> HtmlExp
+hrefDangSmButton ref hexps =
+  href ref hexps `addClass` "btn btn-sm btn-danger"
 
 --- Hypertext reference rendered as an info block button.
 hrefInfoBlock :: String -> [HtmlExp] -> HtmlExp
@@ -213,57 +237,83 @@ hrefScndSmBlock :: String -> [HtmlExp] -> HtmlExp
 hrefScndSmBlock ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-secondary btn-block"
 
--- Hypertext reference rendered as a primary badge.
+----------------------------------------------------------------------------
+-- Badges
+
+--- Hypertext reference rendered as a primary badge.
 hrefPrimBadge :: String -> [HtmlExp] -> HtmlExp
 hrefPrimBadge ref hexps = href ref hexps `addClass` "badge badge-primary"
 
--- Hypertext reference rendered as a secondary badge.
+--- Hypertext reference rendered as a secondary badge.
 hrefScndBadge :: String -> [HtmlExp] -> HtmlExp
 hrefScndBadge ref hexps = href ref hexps `addClass` "badge badge-secondary"
 
--- Hypertext reference rendered as a success badge.
+--- Hypertext reference rendered as a success badge.
 hrefSuccBadge :: String -> [HtmlExp] -> HtmlExp
 hrefSuccBadge ref hexps = href ref hexps `addClass` "badge badge-success"
 
--- Hypertext reference rendered as a warning badge.
+--- Hypertext reference rendered as an info badge.
+hrefInfoBadge :: String -> [HtmlExp] -> HtmlExp
+hrefInfoBadge ref hexps = href ref hexps `addClass` "badge badge-info"
+
+--- Hypertext reference rendered as a warning badge.
 hrefWarnBadge :: String -> [HtmlExp] -> HtmlExp
 hrefWarnBadge ref hexps = href ref hexps `addClass` "badge badge-warning"
 
+--- Hypertext reference rendered as a danger badge.
+hrefDangBadge :: String -> [HtmlExp] -> HtmlExp
+hrefDangBadge ref hexps = href ref hexps `addClass` "badge badge-danger"
 
--- External hypertext reference rendered as a primary badge.
+--- External hypertext reference rendered as a primary badge.
 ehrefPrimBadge :: String -> [HtmlExp] -> HtmlExp
-ehrefPrimBadge ref hexps = ehref ref hexps `addClass` "badge badge-primary"
+ehrefPrimBadge ref hexps = eTarget $ hrefPrimBadge ref hexps
 
--- External hypertext reference rendered as a secondary badge.
+--- External hypertext reference rendered as a secondary badge.
 ehrefScndBadge :: String -> [HtmlExp] -> HtmlExp
-ehrefScndBadge ref hexps = ehref ref hexps `addClass` "badge badge-secondary"
+ehrefScndBadge ref hexps = eTarget $ hrefScndBadge ref hexps
 
--- External hypertext reference rendered as a success badge.
+--- External hypertext reference rendered as a success badge.
 ehrefSuccBadge :: String -> [HtmlExp] -> HtmlExp
-ehrefSuccBadge ref hexps = ehref ref hexps `addClass` "badge badge-success"
+ehrefSuccBadge ref hexps = eTarget $ hrefSuccBadge ref hexps
 
--- External hypertext reference rendered as a warning badge.
+--- External hypertext reference rendered as an info badge.
+ehrefInfoBadge :: String -> [HtmlExp] -> HtmlExp
+ehrefInfoBadge ref hexps = eTarget $ hrefInfoBadge ref hexps
+
+--- External hypertext reference rendered as a warning badge.
 ehrefWarnBadge :: String -> [HtmlExp] -> HtmlExp
-ehrefWarnBadge ref hexps = ehref ref hexps `addClass` "badge badge-warning"
+ehrefWarnBadge ref hexps = eTarget $ hrefWarnBadge ref hexps
 
+--- External hypertext reference rendered as a danger badge.
+ehrefDangBadge :: String -> [HtmlExp] -> HtmlExp
+ehrefDangBadge ref hexps = eTarget $ hrefDangBadge ref hexps
+
+----------------------------------------------------------------------------
+-- Navigation links
 
 --- Hypertext reference in navigations.
 hrefNav :: String -> [HtmlExp] -> HtmlExp
 hrefNav url hexp = href url hexp `addClass` "nav-link"
 
--- Active hypertext reference in navigations.
+--- Active hypertext reference in navigations.
 hrefNavActive :: String -> [HtmlExp] -> HtmlExp
 hrefNavActive url hexp = ehref url hexp `addClass` "nav-link active"
 
--- External hypertext reference in navigations.
+--- External hypertext reference in navigations.
 ehrefNav :: String -> [HtmlExp] -> HtmlExp
 ehrefNav url hexp = ehref url hexp `addClass` "nav-link"
 
--- An external hypertext reference which opens on a new page.
+--- An external hypertext reference which opens on a new page.
 ehref :: String -> [HtmlExp] -> HtmlExp
-ehref ref hexp = href ref hexp `addAttr` ("target","_blank")
+ehref ref hexp = eTarget $ href ref hexp
 
-----------------------------------------------------------------------------
+--- Transforms a hypertext reference into an external one
+--- which opens on a new page.
+--- Basically, the attribute `target="_blank"` is added.
+eTarget :: HtmlExp -> HtmlExp
+eTarget hexp = hexp `addAttr` ("target","_blank")
+
+--------------------------------------------------------------------------
 
 --- Render an HTML expression as keyboard or user input.
 kbdInput :: [HtmlExp] -> HtmlExp
