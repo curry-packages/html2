@@ -13,11 +13,12 @@ module HTML.Styles.Bootstrap4
  , hrefPrimButton, hrefPrimSmButton, hrefScndButton, hrefScndSmButton
  , hrefInfoButton, hrefInfoSmButton, hrefSuccButton, hrefSuccSmButton
  , hrefWarnButton, hrefWarnSmButton, hrefDangButton, hrefDangSmButton
+ , hrefLightButton, hrefLightSmButton, hrefDarkButton, hrefDarkSmButton
  , hrefInfoBlock, hrefPrimSmBlock, hrefScndSmBlock
- , hrefPrimBadge, hrefScndBadge, hrefSuccBadge
- , hrefInfoBadge, hrefWarnBadge, hrefDangBadge
- , ehrefPrimBadge, ehrefScndBadge, ehrefSuccBadge
- , ehrefInfoBadge, ehrefWarnBadge, ehrefDangBadge
+ , hrefPrimBadge, hrefScndBadge, hrefSuccBadge, hrefInfoBadge
+ , hrefWarnBadge, hrefDangBadge, hrefLightBadge, hrefDarkBadge
+ , ehrefPrimBadge, ehrefScndBadge, ehrefSuccBadge, ehrefInfoBadge
+ , ehrefWarnBadge, ehrefDangBadge, ehrefLightBadge, ehrefDarkBadge
  , hrefNav, hrefNavActive, ehrefNav, ehref, eTarget
  , kbdInput
  ) where
@@ -167,7 +168,7 @@ hrefPrimButton :: String -> [HtmlExp] -> HtmlExp
 hrefPrimButton ref hexps =
   href ref hexps `addClass` "btn btn-primary"
 
---- Hypertext reference rendered as a primary small button.
+--- Hypertext reference rendered as a small primary button.
 hrefPrimSmButton :: String -> [HtmlExp] -> HtmlExp
 hrefPrimSmButton ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-primary"
@@ -177,7 +178,7 @@ hrefScndButton :: String -> [HtmlExp] -> HtmlExp
 hrefScndButton ref hexps =
   href ref hexps `addClass` "btn btn-secondary"
 
---- Hypertext reference rendered as a secondary small button.
+--- Hypertext reference rendered as a small secondary button.
 hrefScndSmButton :: String -> [HtmlExp] -> HtmlExp
 hrefScndSmButton ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-secondary"
@@ -187,7 +188,7 @@ hrefInfoButton :: String -> [HtmlExp] -> HtmlExp
 hrefInfoButton ref hexps =
   href ref hexps `addClass` "btn btn-info"
 
---- Hypertext reference rendered as a secondary small button.
+--- Hypertext reference rendered as a small secondary button.
 hrefInfoSmButton :: String -> [HtmlExp] -> HtmlExp
 hrefInfoSmButton ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-info"
@@ -197,7 +198,7 @@ hrefSuccButton :: String -> [HtmlExp] -> HtmlExp
 hrefSuccButton ref hexps =
   href ref hexps `addClass` "btn btn-success"
 
---- Hypertext reference rendered as a success button.
+--- Hypertext reference rendered as a small success button.
 hrefSuccSmButton :: String -> [HtmlExp] -> HtmlExp
 hrefSuccSmButton ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-success"
@@ -207,7 +208,7 @@ hrefWarnButton :: String -> [HtmlExp] -> HtmlExp
 hrefWarnButton ref hexps =
   href ref hexps `addClass` "btn btn-warning"
 
---- Hypertext reference rendered as a warning button.
+--- Hypertext reference rendered as a small warning button.
 hrefWarnSmButton :: String -> [HtmlExp] -> HtmlExp
 hrefWarnSmButton ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-warning"
@@ -217,10 +218,31 @@ hrefDangButton :: String -> [HtmlExp] -> HtmlExp
 hrefDangButton ref hexps =
   href ref hexps `addClass` "btn btn-danger"
 
---- Hypertext reference rendered as a danger button.
+--- Hypertext reference rendered as a small danger button.
 hrefDangSmButton :: String -> [HtmlExp] -> HtmlExp
 hrefDangSmButton ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-danger"
+
+--- Hypertext reference rendered as a light button.
+hrefLightButton :: String -> [HtmlExp] -> HtmlExp
+hrefLightButton ref hexps =
+  href ref hexps `addClass` "btn btn-light"
+
+--- Hypertext reference rendered as a small light button.
+hrefLightSmButton :: String -> [HtmlExp] -> HtmlExp
+hrefLightSmButton ref hexps =
+  href ref hexps `addClass` "btn btn-sm btn-light"
+
+--- Hypertext reference rendered as a dark button.
+hrefDarkButton :: String -> [HtmlExp] -> HtmlExp
+hrefDarkButton ref hexps =
+  href ref hexps `addClass` "btn btn-dark"
+
+--- Hypertext reference rendered as a small dark button.
+hrefDarkSmButton :: String -> [HtmlExp] -> HtmlExp
+hrefDarkSmButton ref hexps =
+  href ref hexps `addClass` "btn btn-sm btn-dark"
+
 
 --- Hypertext reference rendered as an info block button.
 hrefInfoBlock :: String -> [HtmlExp] -> HtmlExp
@@ -264,6 +286,14 @@ hrefWarnBadge ref hexps = href ref hexps `addClass` "badge badge-warning"
 hrefDangBadge :: String -> [HtmlExp] -> HtmlExp
 hrefDangBadge ref hexps = href ref hexps `addClass` "badge badge-danger"
 
+--- Hypertext reference rendered as a light badge.
+hrefLightBadge :: String -> [HtmlExp] -> HtmlExp
+hrefLightBadge ref hexps = href ref hexps `addClass` "badge badge-light"
+
+--- Hypertext reference rendered as a dark badge.
+hrefDarkBadge :: String -> [HtmlExp] -> HtmlExp
+hrefDarkBadge ref hexps = href ref hexps `addClass` "badge badge-dark"
+
 --- External hypertext reference rendered as a primary badge.
 ehrefPrimBadge :: String -> [HtmlExp] -> HtmlExp
 ehrefPrimBadge ref hexps = eTarget $ hrefPrimBadge ref hexps
@@ -287,6 +317,14 @@ ehrefWarnBadge ref hexps = eTarget $ hrefWarnBadge ref hexps
 --- External hypertext reference rendered as a danger badge.
 ehrefDangBadge :: String -> [HtmlExp] -> HtmlExp
 ehrefDangBadge ref hexps = eTarget $ hrefDangBadge ref hexps
+
+--- External hypertext reference rendered as a light badge.
+ehrefLightBadge :: String -> [HtmlExp] -> HtmlExp
+ehrefLightBadge ref hexps = eTarget $ hrefLightBadge ref hexps
+
+--- External hypertext reference rendered as a dark badge.
+ehrefDarkBadge :: String -> [HtmlExp] -> HtmlExp
+ehrefDarkBadge ref hexps = eTarget $ hrefDarkBadge ref hexps
 
 ----------------------------------------------------------------------------
 -- Navigation links
