@@ -14,7 +14,8 @@ module HTML.Styles.Bootstrap4
  , hrefInfoButton, hrefInfoSmButton, hrefSuccButton, hrefSuccSmButton
  , hrefWarnButton, hrefWarnSmButton, hrefDangButton, hrefDangSmButton
  , hrefLightButton, hrefLightSmButton, hrefDarkButton, hrefDarkSmButton
- , hrefInfoBlock, hrefPrimSmBlock, hrefScndSmBlock
+ , hrefPrimBlock, hrefScndBlock, hrefInfoBlock
+ , hrefPrimSmBlock, hrefScndSmBlock, hrefInfoSmBlock
  , hrefPrimBadge, hrefScndBadge, hrefSuccBadge, hrefInfoBadge
  , hrefWarnBadge, hrefDangBadge, hrefLightBadge, hrefDarkBadge
  , ehrefPrimBadge, ehrefScndBadge, ehrefSuccBadge, ehrefInfoBadge
@@ -244,6 +245,16 @@ hrefDarkSmButton ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-dark"
 
 
+-- Hypertext reference rendered as a primary block button.
+hrefPrimBlock :: String -> [HtmlExp] -> HtmlExp
+hrefPrimBlock ref hexps =
+  href ref hexps `addClass` "btn btn-primary btn-block"
+
+-- Hypertext reference rendered as a secondary block button.
+hrefScndBlock :: String -> [HtmlExp] -> HtmlExp
+hrefScndBlock ref hexps =
+  href ref hexps `addClass` "btn btn-secondary btn-block"
+
 --- Hypertext reference rendered as an info block button.
 hrefInfoBlock :: String -> [HtmlExp] -> HtmlExp
 hrefInfoBlock ref hexps =
@@ -258,6 +269,11 @@ hrefPrimSmBlock ref hexps =
 hrefScndSmBlock :: String -> [HtmlExp] -> HtmlExp
 hrefScndSmBlock ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-secondary btn-block"
+
+-- Hypertext reference rendered as a small info block button.
+hrefInfoSmBlock :: String -> [HtmlExp] -> HtmlExp
+hrefInfoSmBlock ref hexps =
+  href ref hexps `addClass` "btn btn-sm btn-info btn-block"
 
 ----------------------------------------------------------------------------
 -- Badges
