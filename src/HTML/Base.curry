@@ -16,7 +16,7 @@
 --- is the command calling the Curry Package Manager).
 ---
 --- @author Michael Hanus (with extensions by Bernd Brassel and Marco Comini)
---- @version May 2020
+--- @version July 2020
 ------------------------------------------------------------------------------
 
 {-# OPTIONS_CYMAKE -Wno-incomplete-patterns #-}
@@ -33,10 +33,12 @@ module HTML.Base
    page, standardPage,
    pageEnc, pageCookie, pageCSS, pageMetaInfo,
    pageLinkInfo, pageBodyAttr, addPageParam, addCookies, addHttpHeader,
-   htxt, htxts, hempty, nbsp, h1, h2, h3, h4, h5,
+   htxt, htxts, hempty, nbsp, h1, h2, h3, h4, h5, h6,
    par, section, header, footer, emphasize, strong, bold, italic, nav, code,
    center, blink, teletype, pre, verbatim, address, href, anchor,
-   ulist, ulistWithClass, olist, olistWithClass, litem, dlist,
+   ulist, ulistWithClass, ulistWithItemClass,
+   olist, olistWithClass, olistWithItemClass,
+   litem, dlist,
    table, tableWithClass, headedTable, addHeadings,
    hrule, breakline, image,
    styleSheet, style, textstyle, blockstyle, inline, block,
@@ -395,6 +397,10 @@ h4 hexps = HtmlStruct "h4" [] hexps
 h5      :: [HtmlExp] -> HtmlExp
 h5 hexps = HtmlStruct "h5" [] hexps
 
+--- Header 6
+h6      :: [HtmlExp] -> HtmlExp
+h6 hexps = HtmlStruct "h6" [] hexps
+
 --- Paragraph
 par      :: [HtmlExp] -> HtmlExp
 par hexps = HtmlStruct "p" [] hexps
@@ -485,6 +491,17 @@ ulistWithClass listclass itemclass items =
  where
   litemWC i = litem i `addClass` itemclass
 
+--- An unordered list with classes for the entire list
+--- individual classes for the list elements.
+--- The class annotation will be ignored if it is empty.
+--- @param listclass - the class for the entire list structure
+--- @param classitems - the list items together with their classes
+ulistWithItemClass :: String -> [(String,[HtmlExp])] -> HtmlExp
+ulistWithItemClass listclass classeditems =
+  HtmlStruct "ul" [] (map litemWC classeditems) `addClass` listclass
+ where
+  litemWC (c,i) = litem i `addClass` c
+
 --- Ordered list.
 --- @param items - the list items where each item is a list of HTML expressions
 olist :: [[HtmlExp]] -> HtmlExp
@@ -500,6 +517,17 @@ olistWithClass listclass itemclass items =
   HtmlStruct "ol" [] (map litemWC items) `addClass` listclass
  where
   litemWC i = litem i `addClass` itemclass
+
+--- An ordered list with classes for the entire list
+--- individual classes for the list elements.
+--- The class annotation will be ignored if it is empty.
+--- @param listclass - the class for the entire list structure
+--- @param classitems - the list items together with their classes
+olistWithItemClass :: String -> [(String,[HtmlExp])] -> HtmlExp
+olistWithItemClass listclass classeditems =
+  HtmlStruct "ol" [] (map litemWC classeditems) `addClass` listclass
+ where
+  litemWC (c,i) = litem i `addClass` c
 
 --- A single list item (usually not explicitly used)
 litem :: [HtmlExp] -> HtmlExp

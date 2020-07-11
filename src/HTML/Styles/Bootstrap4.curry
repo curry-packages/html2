@@ -3,11 +3,11 @@
 --- rendered with [Bootstrap version 4](https://getbootstrap.com/).
 ---
 --- @author Michael Hanus
---- @version May 2020
+--- @version July 2020
 ----------------------------------------------------------------------------
 
 module HTML.Styles.Bootstrap4
- ( bootstrapPage, titledSideMenu
+ ( bootstrapPage, bootstrapPage2, titledSideMenu
  , primButton, primSmButton, scndButton, scndSmButton
  , infoButton, infoSmButton
  , hrefPrimButton, hrefPrimSmButton, hrefScndButton, hrefScndSmButton
@@ -50,10 +50,43 @@ bootstrapPage :: String -> [String] -> [String] -> String -> (String,[HtmlExp])
               -> [HtmlExp] -> [HtmlExp] -> HtmlPage
 bootstrapPage favicon styles jsincludes title brandurltitle lefttopmenu
               righttopmenu leftcols sidemenu header contents footer =
+  bootstrapPage2 favicon styles jsincludes title brandurltitle
+                 (addNavItemClass lefttopmenu) (addNavItemClass righttopmenu)
+                 leftcols sidemenu header contents footer
+ where
+  addNavItemClass = map (\i -> ("nav-item", i))
+
+--- An HTML page rendered with bootstrap with a fixed top navigation bar
+--- and individual classes for the top menu items.
+--- @param favicon   - the icon file `favicon.ico` (when empty not included)
+--- @param styles    - the style files to be included (typically,
+---                    `css/bootstrap.min.css`)
+--- @param jsincludes - the JavaScript files to be included (typically,
+---                     `.../jquery.js`, `js/bootstrap.min.js`)
+--- @param title   - the title of the form
+--- @param brand   - the brand shown top left (a URL/title pair)
+--- @lefttopmenu   - the menu shown in the left side of the top navigation bar
+---                  (with class attribute for the menu items)
+--- @righttopmenu  - the menu shown in the right side of the top navigation bar
+---                  (with class attribute for the menu items, could be empty)
+--- @param columns - number of columns for the left-side menu
+---                  (if columns==0, then the left-side menu is omitted)
+--- @param sidemenu - the menu shown at the left-side of the main document
+---                   (maybe created with 'titledSideMenu')
+--- @param header   - the main header (will be rendered with jumbotron style)
+--- @param contents - the main contents of the document
+--- @param footer   - the footer of the document
+bootstrapPage2 :: String -> [String] -> [String] -> String -> (String,[HtmlExp])
+               -> [(String,[HtmlExp])] -> [(String,[HtmlExp])]
+               -> Int -> [HtmlExp] -> [HtmlExp]
+               -> [HtmlExp] -> [HtmlExp] -> HtmlPage
+bootstrapPage2 favicon styles jsincludes title brandurltitle
+  lefttopmenu righttopmenu leftcols sidemenu header contents footer =
   HtmlPage title
            ([pageEnc "utf-8", responsiveView] ++ icon ++
              map pageCSS styles)
-           (bootstrapBody jsincludes brandurltitle lefttopmenu righttopmenu
+           (bootstrapBody jsincludes brandurltitle
+                          lefttopmenu righttopmenu
                           leftcols sidemenu header contents footer)
  where
   -- for a better view on handheld devices:
@@ -67,8 +100,9 @@ bootstrapPage favicon styles jsincludes title brandurltitle lefttopmenu
            else [pageLinkInfo [("rel","shortcut icon"), ("href",favicon)]]
 
 --- Create body of HTML page. Used by `bootstrapPage`.
-bootstrapBody :: [String] -> (String,[HtmlExp]) -> [[HtmlExp]]
-              -> [[HtmlExp]] -> Int -> [HtmlExp] -> [HtmlExp]
+bootstrapBody :: [String] -> (String,[HtmlExp])
+              -> [(String,[HtmlExp])] -> [(String,[HtmlExp])]
+              -> Int -> [HtmlExp] -> [HtmlExp]
               -> [HtmlExp] -> [HtmlExp] -> [HtmlExp]
 bootstrapBody jsincludes brandurltitle lefttopmenu righttopmenu
               leftcols sidemenu header contents footer =
@@ -99,7 +133,8 @@ bootstrapBody jsincludes brandurltitle lefttopmenu righttopmenu
 -- Navigation bar at the top. The first argument is a header element
 -- put at the left, the second and third arguments are the left
 -- and right menus which will be collapsed if the page is two small.
-topNavigationBar :: (String,[HtmlExp]) -> [[HtmlExp]] -> [[HtmlExp]]
+topNavigationBar :: (String,[HtmlExp])
+                 -> [(String,[HtmlExp])] -> [(String,[HtmlExp])]
                  -> [HtmlExp]
 topNavigationBar (brandurl,brandtitle) leftmenu rightmenu =
   [HtmlStruct "nav"
@@ -115,10 +150,10 @@ topNavigationBar (brandurl,brandtitle) leftmenu rightmenu =
        [textstyle "navbar-toggler-icon" ""],
      HtmlStruct "div" [("id","topnavbar"),
                        ("class","collapse navbar-collapse")] $
-       [ulistWithClass "navbar-nav mr-auto" "nav-item" leftmenu] ++
+       [ulistWithItemClass "navbar-nav mr-auto" leftmenu] ++
        if null rightmenu
          then []
-         else [ulistWithClass "navbar-nav navbar-right" "nav-item" rightmenu]]]
+         else [ulistWithItemClass "navbar-nav navbar-right" rightmenu]]]
 
 --- Create a side menu containing a title and a list of items:
 titledSideMenu :: String -> [[HtmlExp]] -> [HtmlExp]
