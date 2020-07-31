@@ -1,19 +1,22 @@
---------------------------------------------------------------------------
+------------------------------------------------------------------------------
 --- This module implements the management of sessions.
 --- In particular, it defines a cookie that must be sent to the client
 --- in order to enable the handling of sessions.
 --- Based on sessions, this module also defines a session store
 --- that can be used by various parts of the application in order
 --- to hold some session-specific data.
---------------------------------------------------------------------------
+------------------------------------------------------------------------------
 
 module HTML.Session
-  ( sessionCookie, doesSessionExist, withSessionCookie, withSessionCookieInfo
+  ( sessionDataDir, inSessionDataDir
+  , sessionCookie, doesSessionExist, withSessionCookie, withSessionCookieInfo
   , SessionStore, emptySessionStore
   , getSessionMaybeData, getSessionData, putSessionData, removeSessionData
   , updateSessionData
   ) where
 
+import Directory    ( createDirectory, doesDirectoryExist )
+import FilePath     ( (</>) )
 import Global
 import List         ( findIndex, replace )
 import Maybe        ( fromMaybe )
@@ -22,13 +25,26 @@ import Time         ( ClockTime, addMinutes, clockTimeToInt, getClockTime )
 import HTML.Base
 import Crypto.Hash  ( randomString )
 
---- Prefix a file name with the directory where session data,
---- e.g., cookie information, is stored during run time.
---- As a default, it is the CGI execution directory but this should
---- be adapted to a non-public readable directory for security reasons.
-inDataDir :: String -> String
-inDataDir filename = filename
+------------------------------------------------------------------------------
+--- The name of the local directory where the session data,
+--- e.g., cookie information, is stored.
+--- For security reasons, the directory should be non-public readable.
+sessionDataDir :: String
+sessionDataDir = "sessiondata"
 
+--- Prefix a file name with the directory where session data,
+--- e.g., cookie information, is stored.
+inSessionDataDir :: String -> String
+inSessionDataDir filename = sessionDataDir </> filename
+
+--- Ensures that the `sessionDataDir` directory exists.
+--- If it does not exist, it will be created.
+ensureSessionDataDir :: IO ()
+ensureSessionDataDir = do
+  exsdd <- doesDirectoryExist sessionDataDir
+  unless exsdd $ createDirectory sessionDataDir
+
+------------------------------------------------------------------------------
 --- The life span in minutes to store data in sessions.
 --- Thus, older data is deleted by a clean up that is initiated
 --- whenever new data is stored in a session.
@@ -41,7 +57,7 @@ sessionCookieName = "currySessionId"
 
 --- This global value saves time and last session id.
 lastId :: Global (Int, Int)
-lastId = global (0, 0) (Persistent (inDataDir sessionCookieName))
+lastId = global (0, 0) (Persistent (inSessionDataDir sessionCookieName))
 
 
 --- The abstract type to represent session identifiers.
@@ -54,6 +70,7 @@ getId (SessionId i) = i
 --- Creates a new unused session id.
 getUnusedId :: IO SessionId
 getUnusedId = do
+  ensureSessionDataDir
   (ltime,lsid) <- safeReadGlobal lastId (0,0)
   clockTime <- getClockTime
   if clockTimeToInt clockTime /= ltime
@@ -111,7 +128,7 @@ cookieInfoPage = do
                    "inputs and preferences. In order to proceed, "
           , bold [href ('?' : urlparam) [htxt "please click here."]]]]
 
-----------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- Implementation of session stores.
 
 --- The type of a session store that holds particular data used in a session.
@@ -128,15 +145,16 @@ emptySessionStore = SessionStore []
 --- Returns `Nothing` if there is no data for the current session.
 getSessionMaybeData :: Global (SessionStore a) -> IO (Maybe a)
 getSessionMaybeData sessionData = do
-    sid <- getSessionId
-    SessionStore sdata <- safeReadGlobal sessionData emptySessionStore
-    return (findInSession sid sdata)
-  where
-    findInSession si ((id, _, storedData):rest) =
-      if getId id == getId si
-        then Just storedData
-        else findInSession si rest
-    findInSession _ [] = Nothing
+  ensureSessionDataDir
+  sid <- getSessionId
+  SessionStore sdata <- safeReadGlobal sessionData emptySessionStore
+  return (findInSession sid sdata)
+ where
+  findInSession si ((id, _, storedData):rest) =
+    if getId id == getId si
+      then Just storedData
+      else findInSession si rest
+  findInSession _ [] = Nothing
       
 --- Retrieves data for the current user session stored in a session store
 --- where the second argument is returned if there is no data
@@ -148,6 +166,7 @@ getSessionData sessionData defaultdata =
 --- Stores data related to the current user session in a session store.
 putSessionData :: Global (SessionStore a) -> a -> IO ()
 putSessionData sessionData newData = do
+  ensureSessionDataDir
   sid <- getSessionId
   SessionStore sdata <- safeReadGlobal sessionData emptySessionStore
   currentTime <- getClockTime
@@ -170,6 +189,7 @@ updateSessionData sessiondata defaultdata upd = do
 --- Removes data related to the current user session from a session store.
 removeSessionData :: Global (SessionStore a) -> IO ()
 removeSessionData sessionData = do
+  ensureSessionDataDir
   sid <- getSessionId
   SessionStore sdata <- safeReadGlobal sessionData emptySessionStore
   currentTime <- getClockTime
@@ -185,4 +205,4 @@ cleanup currentTime sessionData =
             time > clockTimeToInt (addMinutes (0-sessionLifespan) currentTime))
          sessionData
 
---------------------------------------------------------------------------
+------------------------------------------------------------------------------
