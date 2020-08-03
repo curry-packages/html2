@@ -5,6 +5,9 @@
 --- Based on sessions, this module also defines a session store
 --- that can be used by various parts of the application in order
 --- to hold some session-specific data.
+---
+--- @author Michael Hanus
+--- @version August 2020
 ------------------------------------------------------------------------------
 
 module HTML.Session
@@ -18,8 +21,9 @@ module HTML.Session
 import Directory    ( createDirectory, doesDirectoryExist )
 import FilePath     ( (</>) )
 import Global
-import List         ( findIndex, replace )
+import List         ( findIndex, init, intercalate, replace, split )
 import Maybe        ( fromMaybe )
+import System       ( getEnviron )
 import Time         ( ClockTime, addMinutes, clockTimeToInt, getClockTime )
 
 import HTML.Base
@@ -101,9 +105,25 @@ sessionCookie :: IO PageParam
 sessionCookie = do
   sessionId <- getSessionId
   clockTime <- getClockTime
+  dirpath   <- getScriptDirPath
   return $ PageCookie sessionCookieName (getId (sessionId))
-                      [CookiePath "/",
+                      [CookiePath (if null dirpath then "/" else dirpath),
                        CookieExpire (addMinutes sessionLifespan clockTime)]
+
+--- Gets the directory path of the current CGI script via the
+--- environment variable `SCRIPT_NAME`.
+--- For instance, if the script is called with URL
+--- `http://example.com/cgi/test/script.cgi?parameter`,
+--- then `/cgi/test`  is returned.
+--- If `SCRIPT_NAME` is not set, the returned string is empty.
+getScriptDirPath :: IO String
+getScriptDirPath = do
+  scriptname <- getEnviron "SCRIPT_NAME"
+  let scriptpath = if null scriptname then []
+                                      else split (=='/') (tail scriptname)
+  if null scriptpath
+    then return ""
+    else return $ "/" ++ intercalate "/" (init scriptpath)
 
 --- Decorates an HTML page with session cookie.
 withSessionCookie :: HtmlPage -> IO HtmlPage
