@@ -8,7 +8,7 @@ import HTML.Base
 
 -- Example: a form with button to show the current time.
 timeForm :: HtmlFormDef String
-timeForm = formDefWithID "TimeForm.timeForm" (return "") formHtml
+timeForm = formDef (return "") formHtml
  where
   formHtml _ = [ button "Show time" timeHandler ]
    where

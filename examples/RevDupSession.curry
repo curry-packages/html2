@@ -6,7 +6,6 @@
 -- field in order to use it for the subsequent form.
 ------------------------------------------------------------------------------
 
-import FilePath ( (</>) )
 import Global
 
 import HTML.Base
@@ -14,11 +13,11 @@ import HTML.Session
 
 --- The data stored in a session is the string typed into the input field.
 rdInput :: Global (SessionStore String)
-rdInput = global emptySessionStore (Persistent ("." </> "rdInput"))
+rdInput = global emptySessionStore (Persistent (inSessionDataDir "rdInput"))
 
 -- Example: a form with a text input field and two submit buttons.
 revDupForm :: HtmlFormDef String
-revDupForm = formDefWithID "RevDupSession.revDupForm" readInfo formHtml
+revDupForm = formDef readInfo formHtml
  where
   readInfo = getSessionData rdInput ""
 

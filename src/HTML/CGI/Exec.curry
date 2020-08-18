@@ -46,9 +46,9 @@ printMainPage formmap genpage = catchFormErrors $ do
 --- contained in this form.
 --- The list of CGI variables/values is passed as the second argument.
 execFormDef :: HtmlFormDef a -> [(String,String)] -> IO ()
-execFormDef (HtmlFormDef _ readact formgen) cgivars = catchFormErrors $ do
-  val <- readact
-  hexps <- mapM execHtml (formgen val)
+execFormDef formdef cgivars = catchFormErrors $ do
+  val <- formDefRead formdef
+  hexps <- mapM execHtml (formDefView formdef val)
   let (iform,_) = instCgiRefs hexps 0
   let cenv = cgiGetValue cgivars
   p <- maybe (return noHandlerPage) (\h -> h cenv) (findHandler cenv iform)

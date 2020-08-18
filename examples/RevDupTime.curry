@@ -12,7 +12,7 @@ import TimeForm ( timeForm )
 
 -- Example: a form with a text input field and two submit buttons.
 revDupForm :: HtmlFormDef String
-revDupForm = formDefWithID "RevDupTime.revDupForm" (return "") formHtml
+revDupForm = formDef (return "") formHtml
  where
   formHtml _ =
     [ htxt "Enter a string: ", textField ref ""

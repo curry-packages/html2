@@ -7,7 +7,7 @@ import HTML.Base
 
 -- Example: a form with a text input field and two submit buttons.
 redirectForm :: HtmlFormDef String
-redirectForm = formDefWithID "Redirect.redirectForm" (return "") formHtml
+redirectForm = formDef (return "") formHtml
  where
   formHtml _ =
     [ htxt "Enter a URL: ", textField ref "http://www.google.com"

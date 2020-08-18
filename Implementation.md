@@ -4,7 +4,8 @@ Some implementation details
 This small document describes a few details about the implementation
 of web forms used in this package.
 
-The basic idea is to combine the actions generating the HTML page
+The basic idea of this approach to dynamic web page programming
+is to combine the actions generating the HTML page
 containing the source of the forms with the event handlers processing
 a submitted form in one program (see the various examples
 in directory `examples`). This has the advantage that input
@@ -16,7 +17,7 @@ features of Curry and is explained in detail in
 
 This idea is implemented by starting the same executable for
 generating and processing a form. Therefore, the `action`
-attribute of a form occurring in a web page has the same URL
+attribute of each form occurring in a web page has the same URL
 as the original page, i.e., each form has the structure
 
     <form method="post" action="?">
@@ -67,3 +68,27 @@ to the generated main program. In this case, `curry2cgi` also
 collects the forms in the provided imported modules.
 To speed up this process for larger applications, `curry2cgi`
 caches the form names of a module `M` in file `.curry/M.htmlforms`.
+
+The program `curry2cgi` (implemented in `scripts/Curry2CGI.curry`)
+works as follows. For each module `m` containing form definitions
+do the following:
+
+1. Read the AbstractCurry representation of `m` and collect
+   all public form definitions contained in `m`.
+
+2. Generate a simple Curry program which checks whether the form IDs
+   are identical to the qualified names of the operations defining
+   the form IDs.
+
+3. If some form IDs are not correct, transform the FlatCurry program
+   (in case of KiCS2, the Typed FlatCurry program) of `m` so that
+   correct form IDs are set in the transformed program.
+
+After this phase, pre-compile the main module so that all
+(Typed) FlatCurry files are generated. Then copy the transformed
+programs into the original programs and compile the main module.
+
+*Important note:*
+Due to a problem in the front end (which unecessarily re-compiles
+TypedFlatCurry files used by KiCS2), the transformation of
+TypedFlatCurry programs do not always work with KiCS2.

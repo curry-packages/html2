@@ -12,10 +12,10 @@ import HTML.Session
 
 --- The data stored in the session is the number of guesses.
 guessNr :: Global (SessionStore Int)
-guessNr = global emptySessionStore (Persistent "guessNr")
+guessNr = global emptySessionStore (Persistent (inSessionDataDir "guessNr"))
 
 guessInputForm :: HtmlFormDef Int
-guessInputForm = formDefWithID "Guess.guessInputForm" readGuesses formHtml
+guessInputForm = formDef readGuesses formHtml
  where
   readGuesses = getSessionData guessNr 0 -- read session data
 

@@ -16,7 +16,7 @@
 --- is the command calling the Curry Package Manager).
 ---
 --- @author Michael Hanus (with extensions by Bernd Brassel and Marco Comini)
---- @version July 2020
+--- @version August 2020
 ------------------------------------------------------------------------------
 
 {-# OPTIONS_CYMAKE -Wno-incomplete-patterns #-}
@@ -24,7 +24,8 @@
 module HTML.Base
  ( HtmlExp(..), textOf,
    HtmlPage(..), PageParam(..),
-   HtmlFormDef(..), formDefWithID, formDefId,
+   HtmlFormDef, formDef, formDefWithID, formDefId, setFormDefId,
+   formDefRead, formDefView,
    CookieParam(..),
    CgiRef, idOfCgiRef, instCgiRefs, CgiEnv, HtmlHandler,
    defaultEncoding,
@@ -132,7 +133,18 @@ textOf = unwords . filter (not . null) . map textOfHtmlExp
 --- change it, since it is applied twice when executing a form.
 data HtmlFormDef a = HtmlFormDef String (IO a) (a -> [HtmlExp])
 
---- A definition of a form with a unique identifier of form (usually,
+--- A definition of a form which consists of a (reading!) IO action
+--- and a mapping from data into an HTML expression
+--- (which usually contains event handlers to produce the form answers).
+--- It is assumed that the IO action reads only data and does not
+--- change it, since it is applied twice when executing a form.
+---
+--- The unique identifier required for the implementation of forms
+--- is added by the `curry2cgi` translator.
+formDef :: IO a -> (a -> [HtmlExp]) -> HtmlFormDef a
+formDef = HtmlFormDef ""
+
+--- A definition of a form with a unique identifier (usually,
 --- the qualified name of the operation defining the form).
 --- A form contains a (reading!) IO action and a mapping from data
 --- into an HTML expression (which usually contains event handlers
@@ -145,6 +157,21 @@ formDefWithID = HtmlFormDef
 --- Returns the identifier of a form definition.
 formDefId :: HtmlFormDef a -> String
 formDefId (HtmlFormDef s _ _) = s
+
+--- Sets the identifier of a form definition.
+--- Only intended for internal use in the `curry2cgi` translator.
+setFormDefId :: String -> HtmlFormDef a -> HtmlFormDef a
+setFormDefId fid (HtmlFormDef _ readact formgen) =
+  HtmlFormDef fid readact formgen
+
+--- Returns the read action of a form definition.
+formDefRead :: HtmlFormDef a -> IO a
+formDefRead (HtmlFormDef _ ra _) = ra
+
+--- Returns the read action of a form definition.
+formDefView :: HtmlFormDef a -> (a -> [HtmlExp])
+formDefView (HtmlFormDef _ _ v) = v
+
 
 -- Auxiliary operations for executing forms.
 
