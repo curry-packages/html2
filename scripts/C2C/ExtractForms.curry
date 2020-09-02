@@ -4,14 +4,15 @@
 --- necessary.
 ---
 --- @author Michael Hanus
---- @version August 2020
+--- @version September 2020
 ------------------------------------------------------------------------------
 
 module C2C.ExtractForms ( extractFormsInProg )
  where
 
-import Directory    ( doesFileExist, getModificationTime )
+import Directory    ( doesFileExist, getModificationTime, removeFile )
 import FilePath     ( (</>), (<.>) )
+import IO           ( hGetContents, openFile, IOMode(..) )
 import List         ( intercalate, partition )
 import System       ( exitWith, getArgs, getPID, system )
 
@@ -29,8 +30,10 @@ import C2C.TransTypedFlatCurryForms ( setFormIDsInTypedFlatCurry )
 formCacheFile :: String -> String -> String
 formCacheFile mdir mname = inCurrySubdir (mdir </> mname) <.> "htmlforms"
 
---- Extract and check all forms defined in a Curry module (third argument).
---- Returns the qualified names of the exported forms.
+--- Extract and check all forms defined in a Curry module.
+--- Returns the qualified names of the exported forms as the second component.
+--- The first component is `Nothing` when the module was not transformed
+--- to attach form ids, otherwise it is `Just` the module name.
 extractFormsInProg :: Options -> String -> IO (Maybe String, [QName])
 extractFormsInProg opts mname =
   lookupModuleSourceInLoadPath mname >>=
@@ -49,7 +52,14 @@ extractFormsInProg opts mname =
           then readFormsInProg opts mname formfile
           else do
             putStrLnInter opts $ "Reading file '" ++ formfile ++ "'"
-            readFile formfile >>= return . read
+            ffcont <- openFile formfile ReadMode >>= hGetContents
+            case reads ffcont of
+              [(t,"")] -> return t
+              _        -> do
+                putStrLnInfo opts $
+                  "WARNING: removing broken form info file '" ++ formfile ++ "'"
+                removeFile formfile
+                extractWithFormCache (mdir,mfile)
 
 readFormsInProg :: Options -> String -> String -> IO (Maybe String, [QName])
 readFormsInProg opts mname formfile = do
@@ -62,7 +72,7 @@ readFormsInProg opts mname formfile = do
   unless (null privatenames) $ putStrLn $
     "WARNING: Private form operations found (and not translated):\n" ++
     unwords (map snd privatenames)
-  unless (null formnames) $ putStrLnIfNQ opts $
+  unless (null formnames) $ putStrLnInfo opts $
     "Form operations found: " ++ unwords (map snd formnames)
   mbtrans <- if null formnames
                then return Nothing
@@ -96,7 +106,7 @@ checkFormIDsInProg opts mname formnames = do
   if fidok
     then return Nothing
     else do
-      putStrLnIfNQ opts $
+      putStrLnInfo opts $
         "Some forms have non-matching IDs: setting correct form IDs..."
       case optSysName opts of
         "pakcs" -> setFormIDsInFlatCurry opts mname

@@ -5,7 +5,7 @@
 --- for executing cgi scripts.
 ---
 --- @author Michael Hanus
---- @version August 2020
+--- @version September 2020
 ------------------------------------------------------------------------------
 
 module Curry2CGI ( main )
@@ -65,7 +65,7 @@ checkCurrySystem opts = do
 -- and compile it into a CGI binary.
 compileCGI :: Options -> [String] -> String -> IO ()
 compileCGI opts transmods mname = do
-  putStrLnIfNQ opts $ "Wrapping '" ++ mname ++ "' to generate CGI binary..."
+  putStrLnInfo opts $ "Wrapping '" ++ mname ++ "' to generate CGI binary..."
   pid <- getPID
   let mainmod  = mname ++ "_CGIMAIN_" ++ show pid
       maincall = "main_cgi_9999_" ++ show pid
@@ -97,13 +97,13 @@ compileCGI opts transmods mname = do
   cleanMain mainmod
   cdate <- getLocalTime >>= return . calendarTimeToString
   writeFile (cgifile ++ ".log") (cdate ++ ": cgi script compiled\n")
-  putStrLnIfNQ opts $
+  putStrLnInfo opts $
     "New files \"" ++ cgifile ++ "*\" with compiled cgi script generated."
  where
   precompile mainmod = do
     putStrLnInter opts $ "Modules transformed by setting form IDs:\n" ++
                          unwords transmods
-    putStrLnIfNQ opts $ "Pre-compiling " ++ mainmod ++ "..."
+    putStrLnInfo opts $ "Pre-compiling " ++ mainmod ++ "..."
     case optSysName opts of
       "pakcs" -> do readFlatCurry mainmod
                     mapM_ (copyTransFlatCurry opts) transmods
@@ -120,7 +120,7 @@ genShellScript opts cgifile = do
   system $ "/bin/rm -f " ++ cgifile
   langenv <- getEnviron "LANG"
   let limit = optLimit opts
-  let script = unlines $
+      script = unlines $
                  ["#!/bin/sh"] ++
                  (if null langenv then []
                                   else ["LANG=" ++ langenv, "export LANG"]) ++

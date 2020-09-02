@@ -2,7 +2,7 @@
 --- Option process for the `curry2cgi` script.
 ---
 --- @author Michael Hanus
---- @version August 2020
+--- @version September 2020
 ------------------------------------------------------------------------------
 
 module C2C.Options
@@ -24,7 +24,7 @@ banner :: String
 banner = unlines [bannerLine,bannerText,bannerLine]
  where
   bannerText = "Compile Curry programs with HTML forms to CGI executables " ++
-               "(Version of 18/08/20)"
+               "(Version of 02/09/20)"
   bannerLine = take (length bannerText) (repeat '=')
 
 ------------------------------------------------------------------------------
@@ -88,7 +88,11 @@ options =
            "run quietly (no output, only exit code)"
   , Option "v" ["verb"]
             (OptArg (maybe (checkVerb 2) (safeReadNat checkVerb)) "<n>")
-            "verbosity level:\n0: quiet (same as `-q')\n1: show status messages (default)\n2: show intermediate results (same as `-v')\n3: show all details"
+            ("verbosity level:\n" ++
+             "0: quiet (same as `-q')\n" ++
+             "1: show status messages (default)\n" ++
+             "2: show intermediate results (same as `-v')\n" ++
+             "3: show all details")
   , Option "m" ["main"]
             (ReqArg (\s opts -> opts { optMain = s }) "<m>")
             ("Curry expression (of type IO HtmlPage) computing\n" ++
@@ -104,8 +108,9 @@ options =
              "form handlers should be generated")
   , Option "s" ["system"]
             (ReqArg (\s opts -> opts { optSystem = s }) "<s>")
-            ("set path to the root of Curry system\n" ++
-             "(then 'path/bin/curry' is invoked to compile script)")
+            ("set path to the root of Curry system so that\n" ++
+             "'<s>/bin/curry' is invoked to compile script\n" ++
+             "(default: '" ++ installDir ++ "')")
   , Option "" ["cpmexec"]
             (ReqArg (\s opts -> opts { optCPM = s }) "<c>")
             ("set the command to execute programs with the\n" ++
@@ -129,9 +134,6 @@ options =
   checkVerb n opts = if n>=0 && n<4
                      then opts { optVerb = n }
                      else error "Illegal verbosity level (try `-h' for help)"
-
-putStrLnIfNQ :: Options -> String -> IO ()
-putStrLnIfNQ opts s = unless (optVerb opts == 0) $ putStrLn s
 
 putStrLnInfo :: Options -> String -> IO ()
 putStrLnInfo opts s = when (optVerb opts > 0) $ putStrLn s
