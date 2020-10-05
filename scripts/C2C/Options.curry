@@ -24,7 +24,7 @@ banner :: String
 banner = unlines [bannerLine,bannerText,bannerLine]
  where
   bannerText = "Compile Curry programs with HTML forms to CGI executables " ++
-               "(Version of 02/09/20)"
+               "(Version of 30/09/20)"
   bannerLine = take (length bannerText) (repeat '=')
 
 ------------------------------------------------------------------------------

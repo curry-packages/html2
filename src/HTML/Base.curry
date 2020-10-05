@@ -1,37 +1,40 @@
 ------------------------------------------------------------------------------
 --- Library for constructing static and dynamic HTML pages.
---- [This paper](http://www.informatik.uni-kiel.de/~mh/papers/PADL01.html)
---- contains a description of the basic ideas behind this library.
+--- [This paper](https://www.informatik.uni-kiel.de/~mh/papers/PADL01.html)
+--- contains a description of the basic ideas behind an old version
+--- of this library.
 ---
---- A cgi script written with this library can be installed
---- by the command
+--- An application written with this library can be transformed into
+--- a cgi script by the command
 ---
----     cypm exec curry2cgi -m mainPage -o /home/joe/public_html/prog.cgi Prog
+---     > cypm exec curry2cgi -m mainPage -o /home/joe/cgi-bin/prog.cgi Prog
 ---
 --- where `Prog` is the name of the Curry program with
---- the cgi script, `/home/joe/public_html/prog.cgi` is
+--- the cgi script, `/home/joe/cgi-bin/prog.cgi` is
 --- the desired location of the
 --- compiled cgi script, and `mainPage` is the Curry expression
 --- (of type `IO HtmlPage`) computing the HTML page (where `cypm`
 --- is the command calling the Curry Package Manager).
 ---
 --- @author Michael Hanus (with extensions by Bernd Brassel and Marco Comini)
---- @version August 2020
+--- @version September 2020
 ------------------------------------------------------------------------------
 
 {-# OPTIONS_CYMAKE -Wno-incomplete-patterns #-}
 
 module HTML.Base
- ( HtmlExp(..), textOf,
+ ( HTML, htmlText, htmlStruct, hStruct,
+   HtmlExp(..), BaseHtml(..), toHtmlExp, fromHtmlExp, textOf,
    HtmlPage(..), PageParam(..),
-   HtmlFormDef, formDef, formDefWithID, formDefId, setFormDefId,
-   formDefRead, formDefView,
+   FormReader, fromFormReader, toFormReader,
+   HtmlFormDef, simpleFormDef, simpleFormDefWithID, formDef, formDefWithID,
+   formDefId, setFormDefId, formDefRead, formDefView,
    CookieParam(..),
    CgiRef, idOfCgiRef, instCgiRefs, CgiEnv, HtmlHandler,
    defaultEncoding,
    answerText, answerEncText,
    getCookies,
-   page, standardPage,
+   page, headerPage,
    pageEnc, pageCookie, pageCSS, pageMetaInfo,
    pageLinkInfo, pageBodyAttr, addPageParam, addCookies, addHttpHeader,
    htxt, htxts, hempty, nbsp, h1, h2, h3, h4, h5, h6,
@@ -40,17 +43,17 @@ module HTML.Base
    ulist, ulistWithClass, ulistWithItemClass,
    olist, olistWithClass, olistWithItemClass,
    litem, dlist,
-   table, tableWithClass, headedTable, addHeadings,
+   table, tableWithClass, headedTable,
    hrule, breakline, image,
-   styleSheet, style, textstyle, blockstyle, inline, block,
+   styleSheet, style, textstyle, blockstyle, inline, block, hiddenField,
    redirectPage, expires,
-   formExp,
+   formElem,
    button, resetButton, imageButton, coordinates,
    textField, password, textArea, checkBox, checkedBox,
    radioMain, radioMainOff, radioOther,
    selection, selectionInitial, multipleSelection,
-   hiddenField, htmlQuote, htmlIsoUmlauts, addAttr, addAttrs, addClass,
-   showHtmlExps, showHtmlExp, showHtmlPage,
+   htmlQuote, htmlIsoUmlauts, addAttr, addAttrs, addClass,
+   showBaseHtmls, showBaseHtml, showHtmlPage,
    htmlPrelude, htmlTagAttrs,
    getUrlParameter, urlencoded2string, string2urlencoded,
    formatCookie
@@ -67,11 +70,56 @@ infixl 0 `addClass`
 infixl 0 `addPageParam`
 
 ------------------------------------------------------------------------------
---- The default encoding used in generated web pages.
+--- The default encoding used in generated HTML documents.
 defaultEncoding :: String
 defaultEncoding = "utf-8" --"iso-8859-1"
 
 ------------------------------------------------------------------------------
+-- Basic types for (static) HTML documents.
+
+--- The attributes for HTML structures consists of a list of
+--- name/value pairs.
+type Attrs = [(String,String)]
+
+--- The data type to represent static HTML expressions.
+--- @cons BaseText s         - a text string without any further structure
+--- @cons BaseStruct t as hs - a structure with a tag, attributes, and
+---                             HTML expressions inside the structure
+--- @cons BaseAction act     - an action that computes a general HTML expression
+---                            which will be inserted when the HTML document
+---                            is shown (used to implement form expressions)
+data BaseHtml =
+    BaseText   String
+  | BaseStruct String Attrs [BaseHtml]
+  | BaseAction (IO HtmlExp)
+
+--- Updates the attributes in a basic HTML expression.
+updBaseAttrs :: (Attrs -> Attrs) -> BaseHtml -> BaseHtml
+updBaseAttrs _ (BaseText s)                 = BaseText s
+updBaseAttrs f (BaseStruct tag attrs hexps) = BaseStruct tag (f attrs) hexps
+updBaseAttrs _ (BaseAction act)             = BaseAction act
+
+--- A type is an instance of class `HTML` if it has operations to construct
+--- HTML documents, i.e., constructors for basic text strings and
+--- structures with tags and attributes.
+class HTML a where
+  htmlText   :: String -> a
+  htmlStruct :: String -> Attrs -> [a] -> a
+  updAttrs   :: (Attrs -> Attrs) -> a -> a
+
+--- An HTML structure with a given tag and no attributes.
+hStruct :: HTML h => String -> [h] -> h
+hStruct tag = htmlStruct tag []
+
+--- The type of basic HTML expressions is an instance of class `HTML`.
+instance HTML BaseHtml where
+  htmlText   = BaseText
+  htmlStruct = BaseStruct
+  updAttrs   = updBaseAttrs
+
+------------------------------------------------------------------------------
+-- CGI references and environments.
+
 --- The (abstract) data type for representing references to input elements
 --- in HTML forms.
 data CgiRef = CgiRef String
@@ -81,77 +129,148 @@ data CgiRef = CgiRef String
 idOfCgiRef :: CgiRef -> String
 idOfCgiRef (CgiRef i) = i
 
---- The type for representing cgi environments
---- (i.e., mappings from cgi references to the corresponding values of
---- the input elements).
+--- The type for representing cgi environments, i.e., mappings
+--- from cgi references to the corresponding values of the input elements.
 type CgiEnv = CgiRef -> String
 
 --- The type of event handlers occurring in HTML forms.
 type HtmlHandler = CgiEnv -> IO HtmlPage
 
---- The data type for representing HTML expressions.
---- @cons HtmlText s - a text string without any further structure
---- @cons HtmlStruct t as hs - a structure with a tag, attributes, and
----                            HTML expressions inside the structure
---- @cons HtmlCRef h ref - an input element (described by the first argument)
----                        with a cgi reference
+------------------------------------------------------------------------------
+--- The data type for representing HTML expressions with input elements,
+--- i.e., all elements which might occur inside a form.
+--- @cons HtmlText s           - a text string without any further structure
+--- @cons HtmlStruct t as hs   - a structure with a tag, attributes, and
+---                              HTML expressions inside the structure
+--- @cons HtmlCRef ref h       - an input element (described by the second
+---                              argument) with a cgi reference
 --- @cons HtmlEvent h ref hdlr - an input element (first arg) identified
 ---                              by a cgi reference with an associated
 ---                              event handler (typically, a submit button)
---- @cons HtmlAction act - an action that computes an HTML expression
----                      which will be inserted when the HTML document is shown
+--- @cons HtmlAction act       - an action that computes an HTML expression
+---                              which will be inserted when the HTML document
+---                              is shown (used to implement form expressions)
 data HtmlExp =
     HtmlText   String
-  | HtmlStruct String [(String,String)] [HtmlExp]
-  | HtmlCRef   HtmlExp CgiRef
-  | HtmlEvent  HtmlExp CgiRef HtmlHandler
+  | HtmlStruct String Attrs [HtmlExp]
   | HtmlAction (IO HtmlExp)
+  | HtmlCRef   CgiRef HtmlExp
+  | HtmlEvent  CgiRef HtmlHandler HtmlExp
 
+--- Updates the attributes in an HTML expression.
+updHtmlAttrs :: (Attrs -> Attrs) -> HtmlExp -> HtmlExp
+updHtmlAttrs _ (HtmlText s)                 = HtmlText s
+updHtmlAttrs f (HtmlStruct tag attrs hexps) = HtmlStruct tag (f attrs) hexps
+updHtmlAttrs f (HtmlEvent ref handler he)   =
+  HtmlEvent ref handler (updHtmlAttrs f he)
+updHtmlAttrs f (HtmlCRef ref he)            = HtmlCRef ref (updHtmlAttrs f he)
+updHtmlAttrs _ (HtmlAction act)             = HtmlAction act
+
+--- The type of HTML expressions is an instance of class `HTML`.
+instance HTML HtmlExp where
+  htmlText   = HtmlText
+  htmlStruct = HtmlStruct
+  updAttrs   = updHtmlAttrs
+
+--- Transforms a static into a dynamic HTML document.
+toHtmlExp :: BaseHtml -> HtmlExp
+toHtmlExp (BaseText s)         = HtmlText s
+toHtmlExp (BaseStruct t ps hs) = HtmlStruct t ps (map toHtmlExp hs)
+toHtmlExp (BaseAction a)       = HtmlAction a
+
+--- Transforms a dynamic HTML into a static one by dropping references
+--- and event handlers.
+fromHtmlExp :: HtmlExp -> BaseHtml
+fromHtmlExp (HtmlText   s)       = BaseText s
+fromHtmlExp (HtmlStruct t ps hs) = BaseStruct t ps (map fromHtmlExp hs)
+fromHtmlExp (HtmlAction a)       = BaseAction a
+fromHtmlExp (HtmlEvent  _ _ hs)  = fromHtmlExp hs
+fromHtmlExp (HtmlCRef   _ hs)    = fromHtmlExp hs
+
+------------------------------------------------------------------------------
 --- Extracts the textual contents of a list of HTML expressions.
 --- For instance,
 ---
----      textOf [HtmlText "xy", HtmlStruct "a" [] [HtmlText "bc"]] == "xy bc"
+---      textOf [BaseText "xy", BaseStruct "a" [] [BaseText "bc"]] == "xy bc"
 ---
-textOf :: [HtmlExp] -> String
-textOf = unwords . filter (not . null) . map textOfHtmlExp
+textOf :: [BaseHtml] -> String
+textOf = unwords . filter (not . null) . map textOfBaseHtml
  where
-   textOfHtmlExp (HtmlText s) = s
-   textOfHtmlExp (HtmlStruct _ _ hs)   = textOf hs
-   textOfHtmlExp (HtmlCRef   hexp _)   = textOf [hexp]
-   textOfHtmlExp (HtmlEvent  hexp _ _) = textOf [hexp]
-   textOfHtmlExp (HtmlAction _)        = ""
+  textOfBaseHtml (BaseText s)          = s
+  textOfBaseHtml (BaseStruct _ _ hs)   = textOf hs
+  textOfBaseHtml (BaseAction _)        = ""
 
 ------------------------------------------------------------------------------
+-- HTML forms.
+
+--- The type `FormReader` is a monad with operations to read data
+--- to invoke an HTML form.
+--- It is assumed that a `FormReader` action reads only data and does not
+--- change the environment, since the action is applied twice
+--- when executing a form.
+--- A typical action of this kind is `HTML.Session.getSessionData`.
+--- 
+--- The `FormReader` type encapsulates IO actions in order to enforce
+--- the correct use of forms.
+data FormReader a = FormReader (IO a)
+
+--- Transforms a `FormReader` action into a standard IO action.
+fromFormReader :: FormReader a -> IO a
+fromFormReader (FormReader a) = a
+
+--- Transforms an IO action into a `FormReader` action.
+--- This operation should be used with care since it must be
+--- ensured that the action only reads data and does not
+--- change the environment, since the action is applied twice
+--- when executing a form.
+toFormReader :: IO a -> FormReader a
+toFormReader = FormReader
+
+instance Monad FormReader where
+  return x = FormReader (return x)
+  a >>= f = FormReader (fromFormReader a >>= \x -> fromFormReader (f x))
+
 --- The data type for representing HTML forms embedded into HTML pages.
 ---
 --- A form definition consists of a unique identifier of form (usually,
 --- the qualified name of the operation defining the form),
---- a (reading!) IO action and a mapping from data
+--- a `FormReader` action and a mapping from data
 --- into an HTML expression (which usually contains event handlers
 --- to produce the form answers).
---- It is assumed that the IO action reads only data and does not
---- change it, since it is applied twice when executing a form.
-data HtmlFormDef a = HtmlFormDef String (IO a) (a -> [HtmlExp])
+data HtmlFormDef a = HtmlFormDef String (FormReader a) (a -> [HtmlExp])
 
---- A definition of a form which consists of a (reading!) IO action
+--- A definition of a simple form which does not require session data.
+---
+--- The unique identifier required for the implementation of forms
+--- is added by the `curry2cgi` translator.
+simpleFormDef :: [HtmlExp] -> HtmlFormDef ()
+simpleFormDef hexps = HtmlFormDef "" (return ()) (const hexps)
+
+--- A definition of a simple form, which does not require session data,
+--- with a unique identifier (usually, the qualified name of the
+--- operation defining the form).
+simpleFormDefWithID :: String -> [HtmlExp] -> HtmlFormDef ()
+simpleFormDefWithID fid hexps = HtmlFormDef fid (return ()) (const hexps)
+
+--- A definition of a form which consists of a `FormReader` action
 --- and a mapping from data into an HTML expression
 --- (which usually contains event handlers to produce the form answers).
---- It is assumed that the IO action reads only data and does not
+--- It is assumed that the `FormReader` action reads only data and does not
 --- change it, since it is applied twice when executing a form.
 ---
 --- The unique identifier required for the implementation of forms
 --- is added by the `curry2cgi` translator.
-formDef :: IO a -> (a -> [HtmlExp]) -> HtmlFormDef a
+formDef :: FormReader a -> (a -> [HtmlExp]) -> HtmlFormDef a
 formDef = HtmlFormDef ""
 
 --- A definition of a form with a unique identifier (usually,
 --- the qualified name of the operation defining the form).
---- A form contains a (reading!) IO action and a mapping from data
+--- A form contains a `FormReader` action and a mapping from data
 --- into an HTML expression (which usually contains event handlers
 --- to produce the form answers).
---- It is assumed that the IO action reads only data and does not
+--- It is assumed that the `FormReader` action reads only data and does not
 --- change it, since it is applied twice when executing a form.
-formDefWithID :: String -> IO a -> (a -> [HtmlExp]) -> HtmlFormDef a
+formDefWithID :: String -> FormReader a -> (a -> [HtmlExp]) -> HtmlFormDef a
 formDefWithID = HtmlFormDef
 
 --- Returns the identifier of a form definition.
@@ -164,11 +283,11 @@ setFormDefId :: String -> HtmlFormDef a -> HtmlFormDef a
 setFormDefId fid (HtmlFormDef _ readact formgen) =
   HtmlFormDef fid readact formgen
 
---- Returns the read action of a form definition.
+--- Returns the `FormReader` action of a form definition.
 formDefRead :: HtmlFormDef a -> IO a
-formDefRead (HtmlFormDef _ ra _) = ra
+formDefRead (HtmlFormDef _ ra _) = fromFormReader ra
 
---- Returns the read action of a form definition.
+--- Returns the view operation of a form definition.
 formDefView :: HtmlFormDef a -> (a -> [HtmlExp])
 formDefView (HtmlFormDef _ _ v) = v
 
@@ -177,13 +296,14 @@ formDefView (HtmlFormDef _ _ v) = v
 
 --- Computes the initial form of a form definition.
 genInitForm :: HtmlFormDef a -> IO [HtmlExp]
-genInitForm (HtmlFormDef _ readact formgen) = readact >>= return . formgen
+genInitForm (HtmlFormDef _ readact formgen) =
+  fromFormReader readact >>= return . formgen
 
 --- Instantiates all CgiRefs with a unique tag in HTML expressions.
 --- Only internally used.
+--- Parameters: HTML expressions, number for cgi-refs
+--- Result: translated HTML expressions, new number for cgi-refs
 instCgiRefs :: [HtmlExp] -> Int -> ([HtmlExp],Int)
--- arguments: HTMLExps, number for cgi-refs
--- result: translated HTMLExps, new number for cgi-refs
 instCgiRefs [] i = ([],i)
 instCgiRefs (HtmlText s : hexps) i =
   case instCgiRefs hexps i of
@@ -192,12 +312,12 @@ instCgiRefs (HtmlStruct tag attrs hexps1 : hexps2) i =
   case instCgiRefs hexps1 i of
     (nhexps1,j) -> case instCgiRefs hexps2 j of
                      (nhexps2,k) -> (HtmlStruct tag attrs nhexps1 : nhexps2, k)
-instCgiRefs (HtmlEvent (HtmlStruct tag attrs hes) cgiref handler : hexps) i
+instCgiRefs (HtmlEvent cgiref handler (HtmlStruct tag attrs hes) : hexps) i
   | idOfCgiRef cgiref =:= ("FIELD_" ++ show i)
   = case instCgiRefs hexps (i+1) of
       (nhexps,j) ->
-         (HtmlEvent (HtmlStruct tag attrs hes) cgiref handler : nhexps, j)
-instCgiRefs (HtmlCRef hexp cgiref : hexps) i
+         (HtmlEvent cgiref handler (HtmlStruct tag attrs hes) : nhexps, j)
+instCgiRefs (HtmlCRef cgiref hexp : hexps) i
   | idOfCgiRef cgiref =:= ("FIELD_" ++ show i)
   = case instCgiRefs [hexp] (i+1) of
       ([nhexp],j) -> case instCgiRefs hexps j of
@@ -206,12 +326,14 @@ instCgiRefs (HtmlAction _ : _) _ =
   error "HTML.Base.instCgiRefs: HtmlAction occurred"
 
 ------------------------------------------------------------------------------
---- The data type for representing HTML pages.
+--- The data type for representing HTML pages. Since the HTML document
+--- shown in this page is a base HTML expression, it is ensured that
+--- input elements and event handlers occur only in embedded forms.
 --- @cons HtmlPage t ps hs - an HTML page with title t, optional parameters
----         (e.g., cookies) ps, and contents hs
+---                          (e.g., cookies) ps, and contents hs
 --- @cons HtmlAnswer t c - an answer in an arbitrary format where t
 ---         is the content type (e.g., "text/plain") and c is the contents
-data HtmlPage = HtmlPage String [PageParam] [HtmlExp]
+data HtmlPage = HtmlPage String [PageParam] [BaseHtml]
               | HtmlAnswer String String
 
 --- The possible parameters of an HTML page.
@@ -237,12 +359,12 @@ data PageParam = PageEnc         String
                | PageJScript     String
                | PageMeta        [(String,String)]
                | PageLink        [(String,String)]
-               | PageHeadInclude HtmlExp
+               | PageHeadInclude BaseHtml
                | PageBodyAttr    (String,String)
 
 --- An encoding scheme for a HTML page.
 pageEnc :: String -> PageParam
-pageEnc enc = PageEnc enc
+pageEnc = PageEnc
 
 --- A cookie to be sent to the client's browser when a HTML page is
 --- requested.
@@ -251,34 +373,34 @@ pageCookie (n,v) = PageCookie n v []
 
 --- A URL for a CSS file for a HTML page.
 pageCSS :: String -> PageParam
-pageCSS css = PageCSS css
+pageCSS = PageCSS
 
 --- A header to be sent to the client's browser when a HTML page is
 --- requested.
 httpHeader :: String -> String -> PageParam
-httpHeader k v = HttpHeader k v
+httpHeader = HttpHeader
 
 --- Meta information for a HTML page. The argument is a list of
 --- attributes included in the `meta`-tag in the header for this page.
 pageMetaInfo :: [(String,String)] -> PageParam
-pageMetaInfo attrs = PageMeta attrs
+pageMetaInfo = PageMeta
 
 --- Link information for a HTML page. The argument is a list of
 --- attributes included in the `link`-tag in the header for this page.
 pageLinkInfo :: [(String,String)] -> PageParam
-pageLinkInfo attrs = PageLink attrs
+pageLinkInfo = PageLink
 
 --- Optional attribute for the body element of the web page.
 --- More than one occurrence is allowed, i.e., all such attributes are
 --- collected.
 pageBodyAttr :: (String,String) -> PageParam
-pageBodyAttr attr = PageBodyAttr attr
+pageBodyAttr = PageBodyAttr
 
 --- A basic HTML web page with the default encoding.
 --- @param title - the title of the page
 --- @param hexps - the page's body (list of HTML expressions)
 --- @return an HTML page
-page :: String -> [HtmlExp] -> HtmlPage
+page :: String -> [BaseHtml] -> HtmlPage
 page title hexps = HtmlPage title [PageEnc defaultEncoding] hexps
 
 --- A standard HTML web page where the title is included
@@ -286,8 +408,8 @@ page title hexps = HtmlPage title [PageEnc defaultEncoding] hexps
 --- @param title - the title of the page
 --- @param hexps - the page's body (list of HTML expressions)
 --- @return an HTML page with the title as the first header
-standardPage :: String -> [HtmlExp] -> HtmlPage
-standardPage title hexps = page title (h1 [htxt title] : hexps)
+headerPage :: String -> [BaseHtml] -> HtmlPage
+headerPage title hexps = page title (h1 [htxt title] : hexps)
 
 --- Adds a parameter to an HTML page.
 --- @param page - a page
@@ -298,7 +420,7 @@ addPageParam (HtmlPage title params hexps) param =
   HtmlPage title (param:params) hexps
 addPageParam hexp@(HtmlAnswer _ _) _ = hexp
 
---- Add simple cookie to an HTML page.
+--- Adds simple cookie to an HTML page.
 --- The cookies are sent to the client's browser together with this page.
 --- @param cs - the cookies as a list of name/value pairs
 --- @param form - the form to add cookies to
@@ -309,7 +431,7 @@ addCookies cs (HtmlPage title params hexps) =
 addCookies _ (HtmlAnswer _ _) =
   error "addCookies: cannot add cookie to HTML answer"
 
---- Add a HTTP header to a HTML page.
+--- Adds a HTTP header to a HTML page.
 --- Headers are sent to the client's browser together with the page.
 --- @param key   - the name of the HTTP header field
 --- @param value - the value of the HTTP header field
@@ -363,7 +485,7 @@ answerText = HtmlAnswer "text/plain"
 --- @param txt - the contents of the result page
 --- @return an HTML answer page
 answerEncText :: String -> String -> HtmlPage
-answerEncText enc = HtmlAnswer ("text/plain; charset="++enc)
+answerEncText enc = HtmlAnswer ("text/plain; charset=" ++ enc)
 
 --- Generates a redirection page to a given URL.
 --- This is implemented via the HTTP response header `Location` (see also
@@ -379,7 +501,7 @@ redirectPage url = addHttpHeader "Location" url $ page "Redirect" []
 expires :: Int -> HtmlPage -> HtmlPage
 expires secs hpage =
   hpage `addPageParam`
-    PageHeadInclude (HtmlStruct "meta" [("http-equiv","expires"),
+    PageHeadInclude (BaseStruct "meta" [("http-equiv","expires"),
                                         ("content",show secs)] [])
 
 ------------------------------------------------------------------------------
@@ -388,133 +510,133 @@ expires secs hpage =
 --- Basic text as HTML expression.
 --- The text may contain special HTML chars (like &lt;,&gt;,&amp;,&quot;)
 --- which will be quoted so that they appear as in the parameter string.
-htxt   :: String -> HtmlExp
-htxt s = HtmlText (htmlQuote s)
+htxt :: HTML h => String -> h
+htxt s = htmlText (htmlQuote s)
 
 --- A list of strings represented as a list of HTML expressions.
 --- The strings may contain special HTML chars that will be quoted.
-htxts :: [String] -> [HtmlExp]
+htxts :: HTML h => [String] -> [h]
 htxts = map htxt
 
 --- An empty HTML expression.
-hempty :: HtmlExp
-hempty = HtmlText ""
+hempty :: HTML h => h
+hempty = htmlText ""
 
 --- Non breaking Space
-nbsp   :: HtmlExp
-nbsp = HtmlText "&nbsp;"
+nbsp :: HTML h => h
+nbsp = htmlText "&nbsp;"
 
 --- Header 1
-h1      :: [HtmlExp] -> HtmlExp
-h1 hexps = HtmlStruct "h1" [] hexps
+h1 :: HTML h => [h] -> h
+h1 = hStruct "h1"
 
 --- Header 2
-h2      :: [HtmlExp] -> HtmlExp
-h2 hexps = HtmlStruct "h2" [] hexps
+h2 :: HTML h => [h] -> h
+h2 = hStruct "h2"
 
 --- Header 3
-h3      :: [HtmlExp] -> HtmlExp
-h3 hexps = HtmlStruct "h3" [] hexps
+h3 :: HTML h => [h] -> h
+h3 = hStruct "h3"
 
 --- Header 4
-h4      :: [HtmlExp] -> HtmlExp
-h4 hexps = HtmlStruct "h4" [] hexps
+h4 :: HTML h => [h] -> h
+h4 = hStruct "h4"
 
 --- Header 5
-h5      :: [HtmlExp] -> HtmlExp
-h5 hexps = HtmlStruct "h5" [] hexps
+h5 :: HTML h => [h] -> h
+h5 = hStruct "h5"
 
 --- Header 6
-h6      :: [HtmlExp] -> HtmlExp
-h6 hexps = HtmlStruct "h6" [] hexps
+h6 :: HTML h => [h] -> h
+h6 = hStruct "h6"
 
 --- Paragraph
-par      :: [HtmlExp] -> HtmlExp
-par hexps = HtmlStruct "p" [] hexps
+par :: HTML h => [h] -> h
+par = hStruct "p"
 
 --- Section
-section :: [HtmlExp] -> HtmlExp
-section hexps = HtmlStruct "section" [] hexps
+section :: HTML h => [h] -> h
+section = hStruct "section"
 
 --- Header
-header :: [HtmlExp] -> HtmlExp
-header hexps = HtmlStruct "header" [] hexps
+header :: HTML h => [h] -> h
+header = hStruct "header"
 
 --- Footer
-footer :: [HtmlExp] -> HtmlExp
-footer hexps = HtmlStruct "footer" [] hexps
+footer :: HTML h => [h] -> h
+footer = hStruct "footer"
 
 --- Emphasize
-emphasize      :: [HtmlExp] -> HtmlExp
-emphasize hexps = HtmlStruct "em" [] hexps
+emphasize :: HTML h => [h] -> h
+emphasize = hStruct "em"
 
 --- Strong (more emphasized) text.
-strong      :: [HtmlExp] -> HtmlExp
-strong hexps = HtmlStruct "strong" [] hexps
+strong :: HTML h => [h] -> h
+strong = hStruct "strong"
 
 --- Boldface
-bold      :: [HtmlExp] -> HtmlExp
-bold hexps = HtmlStruct "b" [] hexps
+bold :: HTML h => [h] -> h
+bold = hStruct "b"
 
 --- Italic
-italic      :: [HtmlExp] -> HtmlExp
-italic hexps = HtmlStruct "i" [] hexps
+italic :: HTML h => [h] -> h
+italic = hStruct "i"
 
 --- Navigation
-nav :: [HtmlExp] -> HtmlExp
-nav doc = HtmlStruct "nav" [] doc
+nav :: HTML h => [h] -> h
+nav = hStruct "nav"
 
 --- Program code
-code      :: [HtmlExp] -> HtmlExp
-code hexps = HtmlStruct "code" [] hexps
+code :: HTML h => [h] -> h
+code = hStruct "code"
 
 --- Centered text
-center      :: [HtmlExp] -> HtmlExp
-center hexps = HtmlStruct "center" [] hexps
+center :: HTML h => [h] -> h
+center = hStruct "center"
 
 --- Blinking text
-blink      :: [HtmlExp] -> HtmlExp
-blink hexps = HtmlStruct "blink" [] hexps
+blink :: HTML h => [h] -> h
+blink = hStruct "blink"
 
 --- Teletype font
-teletype      :: [HtmlExp] -> HtmlExp
-teletype hexps = HtmlStruct "tt" [] hexps
+teletype :: HTML h => [h] -> h
+teletype = hStruct "tt"
 
 --- Unformatted input, i.e., keep spaces and line breaks and
 --- don't quote special characters.
-pre      :: [HtmlExp] -> HtmlExp
-pre hexps = HtmlStruct "pre" [] hexps
+pre :: HTML h => [h] -> h
+pre = hStruct "pre"
 
 --- Verbatim (unformatted), special characters (&lt;,&gt;,&amp;,&quot;)
 --- are quoted.
-verbatim  :: String -> HtmlExp
-verbatim s = HtmlStruct "pre" [] [HtmlText (htmlQuote s)]
+verbatim :: HTML h => String -> h
+verbatim s = hStruct "pre" [htmlText (htmlQuote s)]
 
 --- Address
-address       :: [HtmlExp] -> HtmlExp
-address hexps = HtmlStruct "address" [] hexps
+address :: HTML h => [h] -> h
+address = hStruct "address"
 
 --- Hypertext reference
-href           :: String -> [HtmlExp] -> HtmlExp
-href ref hexps = HtmlStruct "a" [("href",ref)] hexps
+href :: HTML h => String -> [h] -> h
+href ref = htmlStruct "a" [("href",ref)]
 
 --- An anchored text with a hypertext reference inside a document.
-anchor           :: String -> [HtmlExp] -> HtmlExp
-anchor anc hexps = HtmlStruct "span" [("id",anc)] hexps
+anchor :: HTML h => String -> [h] -> h
+anchor anc = htmlStruct "span" [("id",anc)]
 
 --- Unordered list.
 --- @param items - the list items where each item is a list of HTML expressions
-ulist       :: [[HtmlExp]] -> HtmlExp
-ulist items = HtmlStruct "ul" [] (map litem items)
+ulist :: HTML h => [[h]] -> h
+ulist items = hStruct "ul" (map litem items)
 
 --- An unordered list with classes for the entire list and the list elements.
 --- The class annotation will be ignored if it is empty.
 --- @param listclass - the class for the entire list structure
 --- @param itemclass - the class for the list items
 --- @param items - the list items where each item is a list of HTML expressions
-ulistWithClass :: String -> String -> [[HtmlExp]] -> HtmlExp
+ulistWithClass :: HTML h => String -> String -> [[h]] -> h
 ulistWithClass listclass itemclass items =
-  HtmlStruct "ul" [] (map litemWC items) `addClass` listclass
+  hStruct "ul" (map litemWC items) `addClass` listclass
  where
   litemWC i = litem i `addClass` itemclass
 
@@ -523,25 +645,25 @@ ulistWithClass listclass itemclass items =
 --- The class annotation will be ignored if it is empty.
 --- @param listclass - the class for the entire list structure
 --- @param classitems - the list items together with their classes
-ulistWithItemClass :: String -> [(String,[HtmlExp])] -> HtmlExp
+ulistWithItemClass :: HTML h => String -> [(String,[h])] -> h
 ulistWithItemClass listclass classeditems =
-  HtmlStruct "ul" [] (map litemWC classeditems) `addClass` listclass
+  hStruct "ul" (map litemWC classeditems) `addClass` listclass
  where
   litemWC (c,i) = litem i `addClass` c
 
 --- Ordered list.
 --- @param items - the list items where each item is a list of HTML expressions
-olist :: [[HtmlExp]] -> HtmlExp
-olist items = HtmlStruct "ol" [] (map litem items)
+olist :: HTML h => [[h]] -> h
+olist items = hStruct "ol" (map litem items)
 
 --- An ordered list with classes for the entire list and the list elements.
 --- The class annotation will be ignored if it is empty.
 --- @param listclass - the class for the entire list structure
 --- @param itemclass - the class for the list items
 --- @param items - the list items where each item is a list of HTML expressions
-olistWithClass :: String -> String -> [[HtmlExp]] -> HtmlExp
+olistWithClass :: HTML h => String -> String -> [[h]] -> h
 olistWithClass listclass itemclass items =
-  HtmlStruct "ol" [] (map litemWC items) `addClass` listclass
+  hStruct "ol" (map litemWC items) `addClass` listclass
  where
   litemWC i = litem i `addClass` itemclass
 
@@ -550,29 +672,27 @@ olistWithClass listclass itemclass items =
 --- The class annotation will be ignored if it is empty.
 --- @param listclass - the class for the entire list structure
 --- @param classitems - the list items together with their classes
-olistWithItemClass :: String -> [(String,[HtmlExp])] -> HtmlExp
+olistWithItemClass :: HTML h => String -> [(String,[h])] -> h
 olistWithItemClass listclass classeditems =
-  HtmlStruct "ol" [] (map litemWC classeditems) `addClass` listclass
+  hStruct "ol" (map litemWC classeditems) `addClass` listclass
  where
   litemWC (c,i) = litem i `addClass` c
 
 --- A single list item (usually not explicitly used)
-litem :: [HtmlExp] -> HtmlExp
-litem hexps = HtmlStruct "li" [] hexps
+litem :: HTML h => [h] -> h
+litem = hStruct "li"
 
 --- Description list
 --- @param items - a list of (title/description) pairs (of HTML expressions)
-dlist       :: [([HtmlExp],[HtmlExp])] -> HtmlExp
-dlist items = HtmlStruct "dl" [] (concatMap ditem items)
+dlist :: HTML h => [([h],[h])] -> h
+dlist items = hStruct "dl" (concatMap ditem items)
  where
-  ditem (hexps1,hexps2) = [HtmlStruct "dt" [] hexps1,
-                           HtmlStruct "dd" [] hexps2]
+  ditem (hexps1,hexps2) = [htmlStruct "dt" [] hexps1,
+                           htmlStruct "dd" [] hexps2]
 
 --- Table with a matrix of items where each item is a list of HTML expressions.
-table :: [[[HtmlExp]]] -> HtmlExp
-table items = HtmlStruct "table" []
- (map (\row->HtmlStruct "tr" []
-                 (map (\item -> HtmlStruct "td" [] item) row)) items)
+table :: HTML h => [[[h]]] -> h
+table = hStruct "table" . map (\row -> hStruct "tr" (map (hStruct "td") row))
 
 --- Table with a matrix of items (each item is a list of HTML expressions)
 --- with classes for the entire table, each row, and each data element.
@@ -582,56 +702,42 @@ table items = HtmlStruct "table" []
 --- @param dataclass  - the class for the table data items
 --- @param items - the matrix of table items where each item is a
 ---                list of HTML expressions
-tableWithClass :: String -> String -> String -> [[[HtmlExp]]] -> HtmlExp
+tableWithClass :: HTML h => String -> String -> String -> [[[h]]] -> h
 tableWithClass tableclass rowclass dataclass items =
- HtmlStruct "table" []
-   (map (\row -> HtmlStruct "tr" []
-                   (map (\d -> HtmlStruct "td" [] d `addClass` dataclass) row)
+ hStruct "table"
+   (map (\row -> hStruct "tr"
+                   (map (\d -> hStruct "td" d `addClass` dataclass) row)
                    `addClass` rowclass)
         items) `addClass` tableclass
 
---- Similar to <code>table</code> but introduces header tags for the first row.
-headedTable :: [[[HtmlExp]]] -> HtmlExp
-headedTable = withinTable . table
+--- Similar to `table` but introduces header tags for the first row.
+headedTable :: HTML h => [[[h]]] -> h
+headedTable = hStruct "table" . headedItems
  where
-  withinTable (HtmlStruct "table" attrs (HtmlStruct "tr" rowAttrs row:rows)) =
-      HtmlStruct "table" attrs
-        (HtmlStruct "tr" rowAttrs (map addTh row):rows)
-  addTh x = case x of
-             (HtmlStruct "td" attrs conts) -> HtmlStruct "th" attrs conts
-             other -> other
-
---- Add a row of items (where each item is a list of HTML expressions)
---- as headings to a table. If the first argument is not a table,
---- the headings are ignored.
-addHeadings :: HtmlExp -> [[HtmlExp]] -> HtmlExp
-addHeadings htable headings = case htable of
-   HtmlStruct "table" attrs rows ->
-      HtmlStruct "table" attrs
-         (HtmlStruct "tr" [] (map (\item->HtmlStruct "th" [] item) headings):rows)
-   _ -> htable
-
+  headedItems []         = []
+  headedItems (row:rows) = hStruct "tr" (map (hStruct "th") row) :
+                           map (\r -> hStruct "tr" (map (hStruct "td") r)) rows
 
 --- Horizontal rule
-hrule :: HtmlExp
-hrule = HtmlStruct "hr" [] []
+hrule :: HTML h => h
+hrule = hStruct "hr" []
 
 --- Break a line
-breakline :: HtmlExp
-breakline = HtmlStruct "br" [] []
+breakline :: HTML h => h
+breakline = hStruct "br" []
 
 --- Image
 --- @param src - the URL of the image
 --- @param alt - the alternative text shown instead of the image
-image :: String -> String -> HtmlExp
-image src alt = HtmlStruct "img" [("src",src),("alt",htmlQuote alt)] []
+image :: HTML h => String -> String -> h
+image src alt = htmlStruct "img" [("src",src),("alt",htmlQuote alt)] []
 
 
 -------------- styles and document structuring:
 --- Defines a style sheet to be used in this HTML document.
 --- @param css - a string in CSS format
-styleSheet :: String -> HtmlExp
-styleSheet css = HtmlStruct "style" [("type","text/css")] [HtmlText css]
+styleSheet :: HTML h => String -> h
+styleSheet css = htmlStruct "style" [("type","text/css")] [htmlText css]
 
 --- Provides a style for HTML elements.
 --- The style argument is the name of a style class defined in a
@@ -639,16 +745,16 @@ styleSheet css = HtmlStruct "style" [("type","text/css")] [HtmlText css]
 --- style sheet (see form and page parameters `FormCSS` and `PageCSS`).
 --- @param st - name of a style class
 --- @param hexps - list of HTML expressions
-style :: String -> [HtmlExp] -> HtmlExp
-style st hexps = HtmlStruct "span" [("class",st)] hexps
+style :: HTML h => String -> [h] -> h
+style st = htmlStruct "span" [("class",st)]
 
 --- Provides a style for a basic text.
 --- The style argument is the name of a style class defined in an
 --- external style sheet.
 --- @param st - name of a style class
 --- @param txt - a string (special characters will be quoted)
-textstyle :: String -> String -> HtmlExp
-textstyle st txt = HtmlStruct "span" [("class",st)] [htxt txt]
+textstyle :: HTML h => String -> String -> h
+textstyle st txt = htmlStruct "span" [("class",st)] [htxt txt]
 
 --- Provides a style for a block of HTML elements.
 --- The style argument is the name of a style class defined in an
@@ -657,21 +763,28 @@ textstyle st txt = HtmlStruct "span" [("class",st)] [htxt txt]
 --- before and after these elements.
 --- @param st - name of a style class
 --- @param hexps - list of HTML expressions
-blockstyle :: String -> [HtmlExp] -> HtmlExp
-blockstyle st hexps = HtmlStruct "div" [("class",st)] hexps
+blockstyle :: HTML h => String -> [h] -> h
+blockstyle st = htmlStruct "div" [("class",st)]
 
 --- Joins a list of HTML elements into a single HTML element.
 --- Although this construction has no rendering, it is sometimes useful
 --- for programming when several HTML elements must be put together.
 --- @param hexps - list of HTML expressions
-inline :: [HtmlExp] -> HtmlExp
-inline hexps = HtmlStruct "span" [] hexps
+inline :: HTML h => [h] -> h
+inline = hStruct "span"
 
 --- Joins a list of HTML elements into a block.
 --- A line break is placed before and after these elements.
 --- @param hexps - list of HTML expressions
-block :: [HtmlExp] -> HtmlExp
-block hexps = HtmlStruct "div" [] hexps
+block :: HTML h => [h] -> h
+block = hStruct "div"
+
+--- A hidden field to pass a value referenced by a fixed name.
+--- This function should be used with care since it may cause
+--- conflicts with the CGI-based implementation of this library.
+hiddenField :: HTML h => String -> String -> h
+hiddenField name value =
+  htmlStruct "input" [("type","hidden"),("name",name),("value",value)] []
 
 ------------------------------------------------------------------------------
 -- Forms and input fields:
@@ -684,23 +797,27 @@ block hexps = HtmlStruct "div" [] hexps
 --- useful for REST-based programming with URL parameters).
 --- The form uses a hidden field named `FORMID` to identify the form
 --- in the submitted form controller.
-formExp :: HtmlFormDef a -> HtmlExp
-formExp formspec = HtmlAction htmlAction
+--- 
+--- Since form elements can not be nested, see
+--- [HTML](https://html.spec.whatwg.org/multipage/forms.html#the-form-element),
+--- the form element itself is a static HTML expression.
+formElem :: HtmlFormDef a -> BaseHtml
+formElem formspec = BaseAction formAction
  where
-  htmlAction = do
+  formAction = do
     urlparam <- getUrlParameter
     he       <- genInitForm formspec
     return $
-       HtmlStruct "form" [("method","post"),("action",'?' : urlparam)]
+       HtmlStruct "form" [("method", "post"), ("action", '?' : urlparam)]
          (hiddenField "FORMID" (formDefId formspec) : fst (instCgiRefs he 0))
 
 --- A button to submit a form with a label string and an event handler.
 button :: String -> HtmlHandler -> HtmlExp
 button label handler
   | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlEvent (HtmlStruct "input" [("type","submit"), ("name",ref),
+  = HtmlEvent cref handler
+              (HtmlStruct "input" [("type","submit"), ("name",ref),
                                    ("value",htmlQuote label)] [])
-              cref handler
  where
   cref,ref free
 
@@ -715,9 +832,8 @@ resetButton label =
 imageButton :: String -> HtmlHandler -> HtmlExp
 imageButton src handler
   | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlEvent
+  = HtmlEvent cref handler
        (HtmlStruct "input" [("type","image"),("name",ref),("src",src)] [])
-       cref handler
  where
   cref,ref free
 
@@ -725,19 +841,17 @@ imageButton src handler
 textField :: CgiRef -> String -> HtmlExp
 textField cref contents
   | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef
-       (HtmlStruct "input" [("type","text"),("name",ref),
-                            ("value",htmlQuote contents)] [])
-       cref
+  = HtmlCRef cref
+      (HtmlStruct "input" [("type","text"),("name",ref),
+                           ("value",htmlQuote contents)] [])
  where ref free
 
 --- Input text field (where the entered text is obscured) with a reference
 password :: CgiRef -> HtmlExp
 password cref
   | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef
+  = HtmlCRef cref
        (HtmlStruct "input" [("type","password"),("name",ref)] [])
-       cref
  where
    ref free
 
@@ -745,11 +859,10 @@ password cref
 textArea :: CgiRef -> (Int,Int) -> String -> HtmlExp
 textArea cref (height,width) contents
   | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef
+  = HtmlCRef cref
        (HtmlStruct "textarea" [("name",ref),
                                 ("rows",show height),("cols",show width)]
                                [htxt contents])
-       cref
  where
    ref free
 
@@ -758,10 +871,9 @@ textArea cref (height,width) contents
 checkBox :: CgiRef -> String -> HtmlExp
 checkBox cref value
   | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef
+  = HtmlCRef cref
        (HtmlStruct "input" [("type","checkbox"),("name",ref),
                             ("value",htmlQuote value)] [])
-       cref
  where
    ref free
 
@@ -770,10 +882,9 @@ checkBox cref value
 checkedBox :: CgiRef -> String -> HtmlExp
 checkedBox cref value
   | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef
+  = HtmlCRef cref
        (HtmlStruct "input" [("type","checkbox"),("name",ref),
                             ("value",htmlQuote value),("checked","checked")] [])
-       cref
  where
    ref free
 
@@ -789,10 +900,9 @@ checkedBox cref value
 radioMain :: CgiRef -> String -> HtmlExp
 radioMain cref value
   | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef
+  = HtmlCRef cref
        (HtmlStruct "input" [("type","radio"),("name",ref),
                             ("value",htmlQuote value),("checked","yes")] [])
-       cref
  where
    ref free
 
@@ -801,10 +911,9 @@ radioMain cref value
 radioMainOff :: CgiRef -> String -> HtmlExp
 radioMainOff cref value
   | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef
+  = HtmlCRef cref
        (HtmlStruct "input" [("type","radio"),("name",ref),
                             ("value",htmlQuote value)] [])
-       cref
  where
    ref free
 
@@ -825,11 +934,10 @@ radioOther cref value
 selection :: CgiRef -> [(String,String)] -> HtmlExp
 selection cref menue
   | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef
+  = HtmlCRef cref
        (HtmlStruct "select" [("name",ref)]
          ((concat . map (\(n,v)->[HtmlStruct "option" [("value",v)] [htxt n]]))
           menue))
-       cref
  where
    ref free
 
@@ -844,8 +952,7 @@ selection cref menue
 selectionInitial :: CgiRef -> [(String,String)] -> Int -> HtmlExp
 selectionInitial cref sellist sel
   | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef (HtmlStruct "select" [("name",ref)] (selOption sellist sel))
-             cref
+  = HtmlCRef cref (HtmlStruct "select" [("name",ref)] (selOption sellist sel))
  where
    ref free
 
@@ -864,9 +971,9 @@ selectionInitial cref sellist sel
 multipleSelection :: CgiRef -> [(String,String,Bool)] -> HtmlExp
 multipleSelection cref sellist
   | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef (HtmlStruct "select" [("name",ref),("multiple","multiple")]
-                                  (map selOption sellist))
-            cref
+  = HtmlCRef cref
+             (HtmlStruct "select" [("name",ref),("multiple","multiple")]
+                                   (map selOption sellist))
  where
    ref free
 
@@ -874,14 +981,6 @@ multipleSelection cref sellist
       HtmlStruct "option"
         ([("value",v)] ++ if flag then [("selected","selected")] else [])
         [htxt n]
-
---- A hidden field to pass a value referenced by a fixed name.
---- This function should be used with care since it may cause
---- conflicts with the CGI-based implementation of this library.
-hiddenField :: String -> String -> HtmlExp
-hiddenField name value =
-    HtmlStruct "input" [("type","hidden"),("name",name),("value",value)] []
-
 
 ------------------------------------------------------------------------------
 --- Quotes special characters (`<`,`>`,`&`,`"`, umlauts) in a string
@@ -913,23 +1012,16 @@ htmlIsoUmlauts (c:cs) | oc==228 = "&auml;"  ++ htmlIsoUmlauts cs
 
 ------------------------------------------------------------------------------
 --- Adds an attribute (name/value pair) to an HTML element.
-addAttr :: HtmlExp -> (String,String) -> HtmlExp
+addAttr :: HTML h => h -> (String,String) -> h
 addAttr hexp attr = addAttrs hexp [attr]
 
 --- Adds a list of attributes (name/value pair) to an HTML element.
-addAttrs :: HtmlExp -> [(String,String)] -> HtmlExp
-addAttrs (HtmlText s) _ = HtmlText s  -- strings have no attributes
-addAttrs (HtmlStruct tag attrs hexps) newattrs =
-    HtmlStruct tag (attrs ++ newattrs) hexps
-addAttrs (HtmlEvent hexp cref handler) attrs =
-    HtmlEvent (addAttrs hexp attrs) cref handler
-addAttrs (HtmlCRef  hexp cref) attrs =
-    HtmlCRef (addAttrs hexp attrs) cref
-addAttrs (HtmlAction act) _ = HtmlAction act
+addAttrs :: HTML h => h -> Attrs -> h
+addAttrs h newattrs = updAttrs (++newattrs) h
 
 --- Adds a class attribute to an HTML element
 --- (if the class attribute is not empty).
-addClass :: HtmlExp -> String -> HtmlExp
+addClass :: HTML h => h -> String -> h
 addClass hexp cls | null cls  = hexp
                   | otherwise = addAttr hexp ("class",cls)
 
@@ -953,24 +1045,8 @@ concatS xs@(_:_) = foldr1 (\ f g -> f . g) xs
 
 ------------------------------------------------------------------------------
 --- Transforms a list of HTML expressions into string representation.
-showHtmlExps :: [HtmlExp] -> String
-showHtmlExps hexps = showsHtmlExps 0 hexps ""
-
--- get the string contents of an HTML expression:
-getText :: HtmlExp -> String
-getText (HtmlText   s)      = s
-getText (HtmlStruct _ _ _)  = ""
-getText (HtmlEvent  he _ _) = getText he
-getText (HtmlCRef   he _)   = getText he
-getText (HtmlAction _)      = ""
-
--- get the (last) tag of an HTML expression:
-getTag :: HtmlExp -> String
-getTag (HtmlText   _)       = ""
-getTag (HtmlStruct tag _ _) = tag
-getTag (HtmlEvent  he _ _)  = getTag he
-getTag (HtmlCRef   he _)    = getTag he
-getTag (HtmlAction  _)      = ""
+showBaseHtmls :: [BaseHtml] -> String
+showBaseHtmls hexps = showsBaseHtmls 0 hexps ""
 
 -- is this a tag where a line break can be safely added?
 tagWithLn :: String -> Bool
@@ -980,18 +1056,17 @@ tagWithLn t = t/="" &&
                         "html","title","head","body","link","meta","script",
                         "form","table","tr","td"]
 
-
 --- Transforms a single HTML expression into string representation.
-showHtmlExp :: HtmlExp -> String
-showHtmlExp hexp = showsHtmlExp 0 hexp ""
+showBaseHtml :: BaseHtml -> String
+showBaseHtml hexp = showsBaseHtml 0 hexp ""
 
 --- HTML tags that have no end tag in HTML:
 noEndTags :: [String]
 noEndTags = ["img","input","link","meta"]
 
-showsHtmlExp :: Int -> HtmlExp -> ShowS
-showsHtmlExp _ (HtmlText s) = showString s
-showsHtmlExp i (HtmlStruct tag attrs hexps) =
+showsBaseHtml :: Int -> BaseHtml -> ShowS
+showsBaseHtml _ (BaseText s) = showString s
+showsBaseHtml i (BaseStruct tag attrs hexps) =
   let maybeLn j = if tagWithLn tag then nl . showTab j else id
    in maybeLn i .
       (if null hexps && (null attrs || tag `elem` noEndTags)
@@ -1001,38 +1076,42 @@ showsHtmlExp i (HtmlStruct tag attrs hexps) =
       ) . maybeLn i
  where
   showExps = if tag=="pre"
-               then concatS . map (showsHtmlExp 0)
-               else showsHtmlExps (i+2)
-showsHtmlExp i (HtmlEvent hexp _ _) = showsHtmlExp i hexp
-showsHtmlExp i (HtmlCRef  hexp _)   = showsHtmlExp i hexp
-showsHtmlExp _ (HtmlAction  _)      =
-  error "HTML.Base.showsHtmlExp: HtmlAction occurred"
+               then concatS . map (showsBaseHtml 0)
+               else showsBaseHtmls (i+2)
+showsBaseHtml _ (BaseAction  _)      =
+  error "HTML.Base.showsBaseHtml: BaseAction occurred"
 
-showsHtmlExps :: Int -> [HtmlExp] -> ShowS
-showsHtmlExps _ [] = id
-showsHtmlExps i (he:hes) = showsWithLnPrefix he . showsHtmlExps i hes
+showsBaseHtmls :: Int -> [BaseHtml] -> ShowS
+showsBaseHtmls _ [] = id
+showsBaseHtmls i (he:hes) = showsWithLnPrefix he . showsBaseHtmls i hes
  where
-   showsWithLnPrefix hexp = let s = getText hexp
-                            in if s/="" && isSpace (head s)
-                                 then nl . showTab i . showString (tail s)
-                                 else showsHtmlExp i hexp
+  showsWithLnPrefix hexp = let s = textOfBaseHtml hexp
+                           in if s /= "" && isSpace (head s)
+                                then nl . showTab i . showString (tail s)
+                                else showsBaseHtml i hexp
+
+  -- get the string contents of an HTML expression:
+  textOfBaseHtml :: BaseHtml -> String
+  textOfBaseHtml (BaseText   s)        = s
+  textOfBaseHtml (BaseStruct _ _ _)    = ""
+  textOfBaseHtml (BaseAction _)        = ""
 
 showTab :: Int -> String -> String
 showTab n = showString (take n (repeat ' '))
 
-showsHtmlOpenTag :: String -> [(String,String)] -> String -> ShowS
+showsHtmlOpenTag :: String -> Attrs -> String -> ShowS
 showsHtmlOpenTag tag attrs close =
   showChar '<' . showString tag .
   concatS (map attr2string attrs) . showString close
  where
-    attr2string (attr,value) = showChar ' ' . showString attr .
-         showString "=\"" . encodeQuotes value . showChar '"'
+    attr2string (attr,value) =
+      showChar ' ' . showString attr .
+                     showString "=\"" . encodeQuotes value . showChar '"'
 
     -- encode double quotes as "&quot;":
     encodeQuotes [] = id
     encodeQuotes (c:cs) | c=='"'    = showString "&quot;" . encodeQuotes cs
                         | otherwise = showChar c . encodeQuotes cs
-
 
 ------------------------------------------------------------------------------
 --- Transforms HTML page into string representation.
@@ -1042,35 +1121,38 @@ showHtmlPage :: HtmlPage -> String
 showHtmlPage (HtmlAnswer _ cont)            = cont
 showHtmlPage (HtmlPage   title params html) =
   htmlPrelude ++
-  showHtmlExp (HtmlStruct "html" htmlTagAttrs
-                  [HtmlStruct "head" []
-                       ([HtmlStruct "title" [] [HtmlText (htmlQuote title)]] ++
-                       concatMap param2html params),
-                   HtmlStruct "body" bodyattrs html])
+  showBaseHtml (BaseStruct "html" htmlTagAttrs
+                  [BaseStruct "head" []
+                       ([BaseStruct "title" [] [BaseText (htmlQuote title)]] ++
+                        concatMap pageParam2HTML params),
+                   BaseStruct "body" bodyattrs html])
  where
-  param2html (PageEnc enc) =
-     [HtmlStruct "meta" [("http-equiv","Content-Type"),
-                         ("content","text/html; charset="++enc)] []]
-  param2html (PageCookie _ _ _) = [] -- cookies are differently processed
-  param2html (PageCSS css) =
-     [HtmlStruct "link" [("rel","stylesheet"),("type","text/css"),("href",css)]
-                 []]
-  param2html (HttpHeader _ _) = [] -- page headers are differently processed
-  param2html (PageJScript js) =
-     [HtmlStruct "script" [("type","text/javascript"),("src",js)] []]
-  param2html (PageMeta attrs) = [HtmlStruct "meta" attrs []]
-  param2html (PageLink attrs) = [HtmlStruct "link" attrs []]
-  param2html (PageHeadInclude hexp) = [hexp]
-  param2html (PageBodyAttr _) = [] -- these attributes are separately processed
-
   bodyattrs = [attr | (PageBodyAttr attr) <- params]
+
+--- Translates page parameters into HTML expressions.
+--- Used to show HTML pages.
+pageParam2HTML :: PageParam -> [BaseHtml]
+pageParam2HTML (PageEnc enc) =
+   [BaseStruct "meta" [("http-equiv","Content-Type"),
+                       ("content","text/html; charset="++enc)] []]
+pageParam2HTML (PageCookie _ _ _) = [] -- cookies are differently processed
+pageParam2HTML (PageCSS css) =
+   [BaseStruct "link" [("rel","stylesheet"),("type","text/css"),("href",css)]
+               []]
+pageParam2HTML (HttpHeader _ _) = [] -- page headers are differently processed
+pageParam2HTML (PageJScript js) =
+   [BaseStruct "script" [("type","text/javascript"),("src",js)] []]
+pageParam2HTML (PageMeta attrs) = [BaseStruct "meta" attrs []]
+pageParam2HTML (PageLink attrs) = [BaseStruct "link" attrs []]
+pageParam2HTML (PageHeadInclude hexp) = [hexp]
+pageParam2HTML (PageBodyAttr _) = [] --these attributes are separately processed
 
 --- Standard header for generated HTML pages.
 htmlPrelude :: String
 htmlPrelude = "<!DOCTYPE html>\n"
 
 --- Standard attributes for element "html".
-htmlTagAttrs :: [(String,String)]
+htmlTagAttrs :: Attrs
 htmlTagAttrs = [("lang","en")]
 
 ------------------------------------------------------------------------------
@@ -1086,7 +1168,7 @@ htmlTagAttrs = [("lang","en")]
 getUrlParameter :: IO String
 getUrlParameter = getEnviron "QUERY_STRING"
 
---- Translates urlencoded string into equivalent ASCII string.
+--- Translates an URL encoded string into equivalent ASCII string.
 urlencoded2string :: String -> String
 urlencoded2string [] = []
 urlencoded2string (c:cs)
@@ -1095,7 +1177,7 @@ urlencoded2string (c:cs)
                  : urlencoded2string (drop 2 cs)
   | otherwise = c : urlencoded2string cs
 
---- Translates arbitrary strings into equivalent urlencoded string.
+--- Translates arbitrary strings into equivalent URL encoded strings.
 string2urlencoded :: String -> String
 string2urlencoded [] = []
 string2urlencoded (c:cs)

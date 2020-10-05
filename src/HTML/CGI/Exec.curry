@@ -5,7 +5,7 @@
 --- to compile Curry CGI scripts into executables.
 ---
 --- @author Michael Hanus
---- @version October 2019
+--- @version September 2020
 ------------------------------------------------------------------------------
 
 module HTML.CGI.Exec ( printMainPage, execFormDef )
@@ -20,7 +20,6 @@ import Time        ( calendarTimeToString, getLocalTime )
 import HTML.Base
 
 ------------------------------------------------------------------------------
-
 --- Shows the HTML page generated from the second parameter
 --- as a string on stdout.
 --- The forms possibly contained in the HTML page are passed as parameters,
@@ -50,7 +49,7 @@ execFormDef formdef cgivars = catchFormErrors $ do
   val <- formDefRead formdef
   hexps <- mapM execHtml (formDefView formdef val)
   let (iform,_) = instCgiRefs hexps 0
-  let cenv = cgiGetValue cgivars
+      cenv      = cgiGetValue cgivars
   p <- maybe (return noHandlerPage) (\h -> h cenv) (findHandler cenv iform)
   execPage p >>= printPage
   -- for debugging:
@@ -66,7 +65,7 @@ catchFormErrors formact = catch formact showFormError
     let errstr = showError err
     cdate <- getLocalTime >>= return . calendarTimeToString
     hPutStrLn stderr $ cdate ++ ": " ++ errstr
-    printPage $ page "Run-time exception"
+    printPage $ HtmlPage "Run-time exception" [PageEnc defaultEncoding]
       [h1 [htxt "Run-time exception occurred"],
        par [htxt "An error occurred during the execution of the web script."],
        par [htxt $ "Error message: " ++ errstr]]
@@ -76,18 +75,18 @@ printPage :: HtmlPage -> IO ()
 printPage (HtmlAnswer ctype cont) = do
   putStr $ "Content-Length: " ++ show (length cont) ++
            "\nContent-Type: " ++ ctype ++ "\n\n" ++ cont
-printPage p@(HtmlPage _ _ _) = do
-  let (headerstring,hpage) = extractHeader p
+printPage (HtmlPage title params html) = do
+  let (headerstring,otherparams) = extractHeaderFromPageParams params
   putStrLn $ headerstring ++
-             "Content-type: text/html\n\n" ++ showHtmlPage hpage
+             "Content-type: text/html\n\n" ++
+             showHtmlPage (HtmlPage title otherparams html)
 
--- Extract the headers contained in a form as well as the cookies
--- and return a string for the HTTP header of the page
--- if any cookie is set, also return the cache-control header
-extractHeader :: HtmlPage -> (String, HtmlPage)
-extractHeader (HtmlAnswer ctype cont) = ("",HtmlAnswer ctype cont)
-extractHeader (HtmlPage title params hexp) = 
-  (headerstring ++ cookiestring, HtmlPage title otherparams hexp)
+-- Extract the HTTP headers contained in HTML page parameters
+-- as well as the cookies and return a string for the HTTP header of the page
+-- and, if any cookie is set, also return the cache-control header.
+extractHeaderFromPageParams :: [PageParam] -> (String, [PageParam])
+extractHeaderFromPageParams params =
+  (headerstring ++ cookiestring, otherparams)
  where 
   headerstring = concatMap (++"\n") headers
 
@@ -110,16 +109,17 @@ extractHeader (HtmlPage title params hexp) =
 -- Generates HTML page to show in illegal invocation of a form.
 noHandlerPage :: HtmlPage
 noHandlerPage = page "Illegal Form Submission"
-  [h1 [htxt "Error: illegal form submission"],
+  [h1 [htxt "ERROR: Illegal form submission"],
    par [htxt $ "Your request cannot be processed since the form is not " ++
                "invoked by a submit request!"]]
 
 -- Generates HTML page to show in illegal invocation of a form.
 formNotCompiledPage :: String -> HtmlPage
-formNotCompiledPage formid = page "Form Not Compiled"
-  [h1 [htxt $ "Error: Form \"" ++ formid ++ "\" not compiled!"],
-   par [htxt $ "The form with the identifier above was not compiled! " ++
-               "Please re-compile the web application with all forms!"]]
+formNotCompiledPage formid =
+  HtmlPage "Form Not Compiled" [PageEnc defaultEncoding]
+    [h1 [htxt $ "ERROR: Form \"" ++ formid ++ "\" not compiled!"],
+     par [htxt $ "The form with the identifier above was not compiled! " ++
+                 "Please re-compile the web application with all forms!"]]
 
 -- Transforms a CGI variable mapping into a CGI environment.
 cgiGetValue :: [(String,String)] -> CgiEnv
@@ -128,15 +128,14 @@ cgiGetValue cgivars cgiref =
 
 -- Find the handler corresponding to the variables in the CGI environment.
 findHandler :: CgiEnv -> [HtmlExp] -> Maybe HtmlHandler
-findHandler _ [] = Nothing
+findHandler _    []                   = Nothing
 findHandler cenv (HtmlText _ : hexps) = findHandler cenv hexps
 findHandler cenv (HtmlStruct _ _ hexps1 : hexps2) =
   findHandler cenv (hexps1 ++ hexps2)
-findHandler cenv (HtmlEvent _ cgiref handler : hexps) =
-  if null (cenv cgiref)
-    then findHandler cenv hexps
-    else Just handler
-findHandler cenv (HtmlCRef hexp _ : hexps) = findHandler cenv (hexp : hexps)
+findHandler cenv (HtmlEvent cgiref handler _ : hexps) =
+  if null (cenv cgiref) then findHandler cenv hexps
+                        else Just handler
+findHandler cenv (HtmlCRef _ hexp : hexps) = findHandler cenv (hexp : hexps)
 findHandler _ (HtmlAction _    : _) =
   error "HTML.CGI.Exec: HtmlAction occurred"
 
@@ -145,7 +144,8 @@ findHandler _ (HtmlAction _    : _) =
 -- in the HTML expressions and replaces them by their computed results.
 execPage :: HtmlPage -> IO HtmlPage
 execPage (HtmlPage title params hexps) =
-  mapM execHtml hexps >>= return . HtmlPage title params
+  mapM execHtml (map toHtmlExp hexps) >>=
+  return . HtmlPage title params . map fromHtmlExp
 execPage (HtmlAnswer t c) = return (HtmlAnswer t c)
 
 -- Executes an HTML expression, i.e., execute all HtmlActions contained
@@ -154,10 +154,10 @@ execHtml :: HtmlExp -> IO HtmlExp
 execHtml htmlexp = case htmlexp of
   HtmlText   _           -> return htmlexp
   HtmlStruct tag ats hes -> mapM execHtml hes >>= return . HtmlStruct tag ats
-  HtmlCRef   he cref     -> do hexp <- execHtml he
-                               return (HtmlCRef hexp cref)
-  HtmlEvent  he cref hdl -> do hexp <- execHtml he
-                               return (HtmlEvent hexp cref hdl)
+  HtmlCRef   cref he     -> do hexp <- execHtml he
+                               return (HtmlCRef cref hexp)
+  HtmlEvent  cref hdl he -> do hexp <- execHtml he
+                               return (HtmlEvent cref hdl hexp)
   HtmlAction act         -> act >>= execHtml
 
 ------------------------------------------------------------------------------
@@ -173,22 +173,13 @@ getFormVariables = do
 -- translate a string of cgi environment bindings into list of binding pairs:
 parseCgiEnv :: String -> [(String,String)]
 parseCgiEnv s
-  | s == ""   = []
+  | null s    = []
   | otherwise = map (\ (n,v) -> (n, utf2latin (urlencoded2string v)))
                     (map (splitChar '=') (split (=='&') s))
  where
    -- split a string at the first position of a given character:
    splitChar c xs = let (ys,zs) = break (==c) xs
                     in if zs==[] then (ys,zs) else (ys,tail zs)
-
---- Translates urlencoded string into equivalent ASCII string.
-urlencoded2string :: String -> String
-urlencoded2string [] = []
-urlencoded2string (c:cs)
-  | c == '+'  = ' ' : urlencoded2string cs
-  | c == '%'  = chr (maybe 0 fst (readHex (take 2 cs)))
-                 : urlencoded2string (drop 2 cs)
-  | otherwise = c : urlencoded2string cs
 
 --- Transforms a string with UTF-8 umlauts into a string with latin1 umlauts.
 utf2latin :: String -> String
@@ -199,19 +190,19 @@ utf2latin (c1:c2:cs)
   | otherwise     = c1 : utf2latin (c2:cs)
 
 includeCoordinates :: [(String,String)] -> [(String,String)]
-includeCoordinates [] = []
-includeCoordinates ((tag,val):cenv) 
-  = case break (=='.') tag of
-      (_,[]) -> (tag,val):includeCoordinates cenv
-      (event,['.','x']) -> ("x",val):(event,val):includeCoordinates cenv
-      (_,['.','y']) -> ("y",val):includeCoordinates cenv
-      _ -> error "includeCoordinates: unexpected . in url parameter"
+includeCoordinates []                 = []
+includeCoordinates ((tag,val) : cenv) =
+  case break (=='.') tag of
+    (_,[])            -> (tag,val):includeCoordinates cenv
+    (event,['.','x']) -> ("x",val):(event,val):includeCoordinates cenv
+    (_,['.','y'])     -> ("y",val):includeCoordinates cenv
+    _ -> error "HTML.CGI.Exec.includeCoordinates: unexpected . in URL parameter"
    
 
 -- get n chars from stdin:
 getNChar :: Int -> IO String
 getNChar n = if n<=0 then return ""
-                     else do c <- getChar
+                     else do c  <- getChar
                              cs <- getNChar (n-1)
                              return (c:cs)
 

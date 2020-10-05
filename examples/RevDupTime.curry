@@ -11,31 +11,29 @@ import HTML.Base
 import TimeForm ( timeForm )
 
 -- Example: a form with a text input field and two submit buttons.
-revDupForm :: HtmlFormDef String
-revDupForm = formDef (return "") formHtml
+revDupForm :: HtmlFormDef ()
+revDupForm = simpleFormDef
+  [ htxt "Enter a string: ", textField ref ""
+  , hrule
+  , button "Reverse string" revHandler
+  , button "Duplicate string" dupHandler
+  ]
  where
-  formHtml _ =
-    [ htxt "Enter a string: ", textField ref ""
-    , hrule
-    , button "Reverse string" revHandler
-    , button "Duplicate string" dupHandler
-    ]
-   where
-    ref free
+  ref free
 
-    revHandler env = return $ page "Answer"
-      [ h1 [ htxt $ "Reversed input: " ++ reverse (env ref)] ]
+  revHandler env = return $ page "Answer"
+    [ h1 [ htxt $ "Reversed input: " ++ reverse (env ref)] ]
 
-    dupHandler env = return $ page "Answer"
-      [ h1 [ htxt $ "Duplicated input: " ++ env ref ++ env ref] ]
+  dupHandler env = return $ page "Answer"
+    [ h1 [ htxt $ "Duplicated input: " ++ env ref ++ env ref] ]
 
 -- main HTML page containing the form
 main :: IO HtmlPage
 main = return $ page "Question"
   [ h1 [htxt "This is an example form"]
-  , formExp revDupForm
+  , formElem revDupForm
   , hrule
-  , formExp timeForm
+  , formElem timeForm
   ]
 
 -- Install with (note that we need to include forms from `TimeForm`!):

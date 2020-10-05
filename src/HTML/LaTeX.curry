@@ -3,8 +3,7 @@
 --- into LaTeX string.
 ---
 --- @author Michael Hanus
---- @version October 2017
---- @category web
+--- @version October 2020
 ------------------------------------------------------------------------------
 
 module HTML.LaTeX
@@ -19,13 +18,13 @@ import HTML.Base
 
 --- Transforms HTML expressions into LaTeX string representation.
 
-showLatexExps :: [HtmlExp] -> String
+showLatexExps :: [BaseHtml] -> String
 showLatexExps hexps = concat (map showLatexExp hexps)
 
 --- Transforms an HTML expression into LaTeX string representation.
-showLatexExp :: HtmlExp -> String
-showLatexExp (HtmlText s) = "{" ++ specialchars2tex s ++ "}"
-showLatexExp (HtmlStruct tag attrs htmlexp)
+showLatexExp :: BaseHtml -> String
+showLatexExp (BaseText s) = "{" ++ specialchars2tex s ++ "}"
+showLatexExp (BaseStruct tag attrs htmlexp)
  | tag=="html" = showLatexExps htmlexp
  | tag=="head" = ""                    -- ignore header
  | tag=="body" = showLatexExps htmlexp
@@ -74,9 +73,7 @@ showLatexExp (HtmlStruct tag attrs htmlexp)
  | tag=="input" && maybe "" id (findHtmlAttr "type" attrs) == "hidden" = ""
  | otherwise   = "{\\tt<"++tag++">}" ++ showLatexExps htmlexp ++
                 "{\\tt</"++tag++">}"
-showLatexExp (HtmlCRef  _ _) = error "HTML.LaTeX.showLatexExp: HtmlCref"
-showLatexExp (HtmlEvent _ _ _) = error "HTML.LaTeX.showLatexExp: HtmlEvent"
-showLatexExp (HtmlAction _)    = error "HTML.LaTeX.showLatexExp: HtmlAction"
+showLatexExp (BaseAction _)    = error "HTML.LaTeX.showLatexExp: BaseAction"
 
 -- create latex environment of name "env" with content "content"
 latexEnvironment :: String -> String -> String
@@ -93,26 +90,26 @@ attrLatexEnv env attr content
 -- yield the format of a table, e.g. {lll} from list of html rows.
 -- for longtables we set the chunksize big enough
 -- to avoid having to rerun latex for inaccurat tables.
-latexTabFormat :: [HtmlExp] -> String
+latexTabFormat :: [BaseHtml] -> String
 latexTabFormat rows = "{" ++ replicate breadth 'l' ++ "}"
-  ++ "\\setcounter{LTchunksize}{"++show (length rows+5)++"}%"
+  ++ "\\setcounter{LTchunksize}{" ++ show (length rows + 5) ++ "}%"
   where
     breadth = foldl max 0 (map getBreadth rows)
 
 -- retrieve the breadth of an Html row
-getBreadth :: HtmlExp -> Int
+getBreadth :: BaseHtml -> Int
 getBreadth row = case row of
-                     HtmlStruct "tr" _ tds -> length tds
-                     _ -> error "getBreadth: no row given"
+  BaseStruct "tr" _ tds -> length tds
+  _                     -> error "getBreadth: no row given"
 
 -- tranlate expressions inside tables
-showLatexTableContents :: [HtmlExp] -> String
+showLatexTableContents :: [BaseHtml] -> String
 showLatexTableContents hexps = concatMap showLatexTableContent hexps
 
 -- tranlate expressions inside tables
-showLatexTableContent :: HtmlExp -> String
-showLatexTableContent (HtmlText s) = "{" ++ specialchars2tex s ++ "}"
-showLatexTableContent (HtmlStruct tag attrs htmlexp)
+showLatexTableContent :: BaseHtml -> String
+showLatexTableContent (BaseText s) = "{" ++ specialchars2tex s ++ "}"
+showLatexTableContent (BaseStruct tag attrs htmlexp)
  | tag=="html" = showLatexTableContents htmlexp
  | tag=="head" = ""                    -- ignore header
  | tag=="body" = showLatexTableContents htmlexp
@@ -141,12 +138,8 @@ showLatexTableContent (HtmlStruct tag attrs htmlexp)
  | tag=="input" && maybe "" id (findHtmlAttr "type" attrs) == "hidden" = ""
  | otherwise   = "{\\tt<"++tag++">}" ++ showLatexTableContents htmlexp ++
                  "{\\tt</"++tag++">}"
-showLatexTableContent (HtmlCRef  _ _) =
-  error "HTML.LaTeX.showLatexTableContent: HtmlCref"
-showLatexTableContent (HtmlEvent _ _ _) =
-  error "HTML.LaTeX.showLatexTableContent: HtmlEvent"
-showLatexTableContent (HtmlAction _) =
-  error "HTML.LaTeX.showLatexTableContent: HtmlAction"
+showLatexTableContent (BaseAction _) =
+  error "HTML.LaTeX.showLatexTableContent: BaseAction"
 
 -- find a specific tag field in a list of HTML attributes:
 findHtmlAttr :: String -> [(String,String)] -> Maybe String
@@ -254,7 +247,7 @@ htmlspecial2tex special
 --- Transforms HTML expressions into a string representation of a complete
 --- LaTeX document.
 
-showLatexDoc :: [HtmlExp] -> String
+showLatexDoc :: [BaseHtml] -> String
 showLatexDoc htmlexps = showLatexDocs [htmlexps]
 
 --- Transforms HTML expressions into a string representation of a complete
@@ -262,7 +255,7 @@ showLatexDoc htmlexps = showLatexDocs [htmlexps]
 --- The variable "packages" holds the packages to add to the latex document
 --- e.g. "ngerman"
 
-showLatexDocWithPackages :: [HtmlExp] -> [String] -> String
+showLatexDocWithPackages :: [BaseHtml] -> [String] -> String
 showLatexDocWithPackages hexps packages
   = showLatexDocsWithPackages [hexps] packages
 
@@ -270,7 +263,7 @@ showLatexDocWithPackages hexps packages
 --- of a complete LaTeX document where each list entry appears
 --- on a separate page.
 
-showLatexDocs :: [[HtmlExp]] -> String
+showLatexDocs :: [[BaseHtml]] -> String
 showLatexDocs htmlexps_list = showLatexDocsWithPackages htmlexps_list []
 
 
@@ -280,7 +273,7 @@ showLatexDocs htmlexps_list = showLatexDocsWithPackages htmlexps_list []
 --- The variable "packages" holds the packages to add to the latex document
 --- (e.g., "ngerman").
 
-showLatexDocsWithPackages :: [[HtmlExp]] -> [String] -> String
+showLatexDocsWithPackages :: [[BaseHtml]] -> [String] -> String
 showLatexDocsWithPackages htmlexps_list packages =
  "\\documentclass[12pt]{article}\n"++
  concatMap (\p->"\\usepackage{"++p++"}\n") packages++
@@ -303,7 +296,7 @@ showLatexDocsWithPackages htmlexps_list packages =
  "\\end{document}\n"
 
 --- show german latex document
-germanLatexDoc :: [HtmlExp] -> String
+germanLatexDoc :: [BaseHtml] -> String
 germanLatexDoc hexps = showLatexDocWithPackages hexps ["ngerman"]
 
 ------------------------------------------------------------------------------

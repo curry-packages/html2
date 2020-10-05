@@ -74,6 +74,7 @@ readFormsInProg opts mname formfile = do
     unwords (map snd privatenames)
   unless (null formnames) $ putStrLnInfo opts $
     "Form operations found: " ++ unwords (map snd formnames)
+  checkFormElemCallsInProg opts formnames cprog 
   mbtrans <- if null formnames
                then return Nothing
                else checkFormIDsInProg opts mname formnames
@@ -94,6 +95,65 @@ extractFormOps prog =
     _                     -> False
 
 
+------------------------------------------------------------------------------
+-- Check whether all `HTML.Base.formElem` calls are applied to
+-- top-level public form definitions.
+-- The second argument is the list of public form definitions of the
+-- current module.
+checkFormElemCallsInProg :: Options -> [QName] -> CurryProg -> IO ()
+checkFormElemCallsInProg opts formnames prog = do
+  let mname  = progName prog
+      fdecls = functions prog
+      errfuncs = concatMap (checkFormElemCallsInFunc opts formnames mname)
+                           fdecls
+  unless (null errfuncs) $ do
+    putStrLn $ "ERROR: Illegal use of 'HTML.Base.formElem' in function: " ++
+               unwords (map snd errfuncs)
+    exitWith 1
+
+checkFormElemCallsInFunc :: Options -> [QName] -> String -> CFuncDecl -> [QName]
+checkFormElemCallsInFunc opts formnames mname fdecl =
+  concatMap checkRule (funcRules fdecl)
+ where
+  checkRule (CRule _ rhs) = checkRhs rhs
+
+  checkRhs (CSimpleRhs rhs ldecls) = checkExp rhs ++ concatMap checkLDecl ldecls
+  checkRhs (CGuardedRhs gs ldecls) = 
+    concatMap (\ (g,e) -> checkExp g ++ checkExp e) gs ++
+    concatMap checkLDecl ldecls
+
+  checkExp (CVar _)            = []
+  checkExp (CLit _)            = []
+  checkExp (CSymbol _)         = []
+  checkExp (CApply e1 e2)      = checkApply e1 e2
+  checkExp (CLambda _ le)      = checkExp le
+  checkExp (CLetDecl ld le)    = concatMap checkLDecl ld ++ checkExp le
+  checkExp (CDoExpr sl)        = concatMap checkStat sl
+  checkExp (CListComp le sl)   = checkExp le ++ concatMap checkStat sl
+  checkExp (CCase _ ce bl)     =
+    checkExp ce ++ concatMap (\ (_,rhs) -> checkRhs rhs) bl
+  checkExp (CTyped te _)       = checkExp te
+  checkExp (CRecConstr _ upds) = concatMap (checkExp . snd) upds
+  checkExp (CRecUpdate e upds) = checkExp e ++ concatMap (checkExp . snd) upds
+
+  checkApply e1 e2 = case (e1,e2) of
+    (CSymbol f1, CSymbol f2)  -> if f1 /= hfe || fst f2 /= mname ||
+                                    f2 `elem` formnames
+                                   then []
+                                   else [funcName fdecl]
+    (CSymbol f, _) | f == hfe -> [funcName fdecl]
+    _                         -> checkExp e1 ++ checkExp e2
+   where hfe = ("HTML.Base","formElem")
+
+  checkStat (CSExpr e)  = checkExp e
+  checkStat (CSPat _ e) = checkExp e
+  checkStat (CSLet ld)  = concatMap checkLDecl ld
+  
+  checkLDecl (CLocalFunc f)    = concatMap checkRule (funcRules f)
+  checkLDecl (CLocalPat _ rhs) = checkRhs rhs
+  checkLDecl (CLocalVars _)    = []
+
+------------------------------------------------------------------------------
 -- Test whether all `HtmlFormDef` identifiers in a module are correct,
 -- i.e., are identical to the string representation of their defining
 -- operations. If there are some differences, transform the

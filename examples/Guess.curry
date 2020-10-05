@@ -11,39 +11,33 @@ import HTML.Base
 import HTML.Session
 
 --- The data stored in the session is the number of guesses.
-guessNr :: Global (SessionStore Int)
-guessNr = global emptySessionStore (Persistent (inSessionDataDir "guessNr"))
+trials :: Global (SessionStore Int)
+trials = global emptySessionStore (Persistent (inSessionDataDir "trials"))
 
-guessInputForm :: HtmlFormDef Int
-guessInputForm = formDef readGuesses formHtml
+guessForm :: HtmlFormDef Int
+guessForm = formDef (getSessionData trials 1) guessFormHtml
+
+guessFormHtml :: Int -> [HtmlExp]
+guessFormHtml t =
+  [htxt "Guess a number: ", textField nref "", button "Check" guessHandler]
  where
-  readGuesses = getSessionData guessNr 0 -- read session data
+  nref free
 
-  formHtml n =
-    (if n>0 then [h4 [htxt $ show (n+1) ++ ". attempt:"]] else []) ++
-    [htxt "Guess a natural number: ", textField nref "",
-     button "Check" guessHandler]
-   where
-    nref free
-
-    guessHandler env = do
-      let nr = read (env nref) :: Int
-      if nr==42
-        then do
-          putSessionData guessNr 0
-          return $ page "Answer" $
-            [h1 [htxt $ "Right! You needed " ++ show (n+1) ++ " guesses!"]]
-        else do
-          putSessionData guessNr (n+1)
-          return $ page "Answer" $
-            [h1 [htxt $ if nr<42 then "Too small!"
-                                 else "Too large!"],
-             hrule, formExp guessInputForm]
+  guessHandler env = do
+    let nr = read (env nref)
+    if nr==42
+      then do
+        removeSessionData trials
+        return $ headerPage ("Correct! " ++ show t ++ " guesses!") []
+      else do
+        writeSessionData trials (t+1)
+        return $ headerPage ("Too " ++ if nr<42 then "small!" else "large!")
+           [formElem guessForm]
 
 -- main HTML page containing the form
 main :: IO HtmlPage
 main = withSessionCookieInfo $
-  standardPage "Number Guessing Game" [ formExp guessInputForm ]
+  headerPage "Number Guessing Game" [ formElem guessForm ]
 
 -- Install the CGI script in user homepage by:
 -- > cypm exec curry2cgi -o ~/public_html/cgi-bin/guess.cgi Guess

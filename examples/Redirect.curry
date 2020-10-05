@@ -6,22 +6,20 @@
 import HTML.Base
 
 -- Example: a form with a text input field and two submit buttons.
-redirectForm :: HtmlFormDef String
-redirectForm = formDef (return "") formHtml
+redirectForm :: HtmlFormDef ()
+redirectForm = simpleFormDef
+  [ htxt "Enter a URL: ", textField ref "http://www.google.com"
+  , hrule
+  , button "Go to the URL" (\env -> return $ redirectPage (env ref))
+  ]
  where
-  formHtml _ =
-    [ htxt "Enter a URL: ", textField ref "http://www.google.com"
-    , hrule
-    , button "Go to the URL" (\env -> return $ redirectPage (env ref))
-    ]
-   where
-    ref free
+  ref free
 
 -- main HTML page containing the form
 main :: IO HtmlPage
 main = return $ page "Redirection"
   [ h1 [htxt "This is simple example for redirection"],
-    formExp redirectForm ]
+    formElem redirectForm ]
 
 -- Install with:
 -- > cypm exec curry2cgi -o ~/public_html/cgi-bin/redirect.cgi Redirect

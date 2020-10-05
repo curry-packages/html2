@@ -15,7 +15,7 @@ import Char         ( isSpace )
 import Directory    ( createDirectoryIfMissing, doesFileExist )
 import Distribution ( installDir )
 import FileGoodies
-import FilePath     ( (</>) )
+import FilePath     ( (</>), isRelative )
 import GetOpt
 import IOExts       ( evalCmd )
 import List         ( intercalate, isPrefixOf, nub )
@@ -67,7 +67,8 @@ compileCGI :: Options -> [String] -> String -> IO ()
 compileCGI opts transmods mname = do
   putStrLnInfo opts $ "Wrapping '" ++ mname ++ "' to generate CGI binary..."
   pid <- getPID
-  let mainmod  = mname ++ "_CGIMAIN_" ++ show pid
+  let dot2us c = if c == '.' then '_' else c
+      mainmod  = map dot2us mname ++ "_CGIMAIN_" ++ show pid
       maincall = "main_cgi_9999_" ++ show pid
       cgifile  = if null (optOutput opts) then mname ++ ".cgi"
                                           else optOutput opts
@@ -120,12 +121,13 @@ genShellScript opts cgifile = do
   system $ "/bin/rm -f " ++ cgifile
   langenv <- getEnviron "LANG"
   let limit = optLimit opts
+      cgibin = (if isRelative cgifile then "./" else "") ++ cgifile ++ ".bin"
       script = unlines $
                  ["#!/bin/sh"] ++
                  (if null langenv then []
                                   else ["LANG=" ++ langenv, "export LANG"]) ++
                  (if null limit then [] else ["ulimit " ++ limit]) ++
-                 ["exec " ++ cgifile ++ ".bin 2>> " ++ cgifile ++ ".log"]
+                 ["exec " ++ cgibin ++ " 2>> " ++ cgifile ++ ".log"]
   writeFile cgifile script
   system $ unwords ["chmod", "755", cgifile]
   done

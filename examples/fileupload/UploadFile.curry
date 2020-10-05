@@ -12,14 +12,14 @@ import HTML.Base
 -- The arguments are the base name of the file where the contents
 -- of the uploaded file is stored, and the URL loaded after
 -- uploading the file.
-uploadForm :: String -> String -> HtmlExp
+uploadForm :: String -> String -> BaseHtml
 uploadForm uploadfilename redirecturl =
-  HtmlStruct "form" [("method","post"), ("action","upload-handler.cgi"),
+  htmlStruct "form" [("method","post"), ("action","upload-handler.cgi"),
                      ("enctype","multipart/form-data")]
     [hiddenField "UPLOADNAME" uploadfilename,
      hiddenField "REDIRECT" redirecturl,
-     HtmlStruct "input" [("type","file"), ("name","FILENAME")] [],
-     HtmlStruct "input" [("type","submit"), ("value", "Upload!")] []
+     htmlStruct "input" [("type","file"), ("name","FILENAME")] [],
+     htmlStruct "input" [("type","submit"), ("value", "Upload!")] []
     ]
 
 -- main HTML page containing the form

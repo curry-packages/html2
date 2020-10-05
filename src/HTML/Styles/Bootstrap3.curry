@@ -3,7 +3,7 @@
 --- rendered with [Bootstrap](http://twitter.github.com/bootstrap/)
 ---
 --- @author Michael Hanus
---- @version October 2019
+--- @version September 2020
 ----------------------------------------------------------------------------
 
 module HTML.Styles.Bootstrap3
@@ -37,9 +37,9 @@ import HTML.Base
 --- @param header   - the main header (rendered with jumbotron style)
 --- @param contents - the main contents of the document
 --- @param footer   - the footer of the document
-bootstrapPage :: String -> [String] -> String -> (String,[HtmlExp])
-              -> [[HtmlExp]] -> [[HtmlExp]] -> Int -> [HtmlExp] -> [HtmlExp]
-              -> [HtmlExp] -> [HtmlExp] -> HtmlPage
+bootstrapPage :: String -> [String] -> String -> (String,[BaseHtml])
+              -> [[BaseHtml]] -> [[BaseHtml]] -> Int -> [BaseHtml] -> [BaseHtml]
+              -> [BaseHtml] -> [BaseHtml] -> HtmlPage
 bootstrapPage rootdir styles title brandurltitle lefttopmenu righttopmenu
               leftcols sidemenu header contents footer =
   HtmlPage title
@@ -57,11 +57,11 @@ bootstrapPage rootdir styles title brandurltitle lefttopmenu righttopmenu
                        ("href",rootdir++"/favicon.ico")]
 
 --- Create body of HTML page. Used by bootstrapForm and bootstrapPage.
-bootstrapBody :: String -> (String,[HtmlExp]) -> [[HtmlExp]]
-              -> [[HtmlExp]] -> Int -> [HtmlExp] -> [HtmlExp]
-              -> [HtmlExp] -> [HtmlExp] -> [HtmlExp]
+bootstrapBody ::
+  HTML h => String -> (String,[h]) -> [[h]] -> [[h]] -> Int -> [h] -> [h]
+         -> [h] -> [h] -> [h]
 bootstrapBody rootdir brandurltitle lefttopmenu righttopmenu
-              leftcols sidemenu header contents footer =
+              leftcols sidemenu header contents footerdoc =
   topNavigationBar brandurltitle lefttopmenu righttopmenu ++
   [blockstyle "container-fluid"
    ([blockstyle "row"
@@ -72,31 +72,30 @@ bootstrapBody rootdir brandurltitle lefttopmenu righttopmenu
               [blockstyle "well nav-sidebar" sidemenu],
              blockstyle (bsCols (12-leftcols))
               (headerRow ++ contents)])] ++
-     if null footer
-      then []
-      else [hrule, HtmlStruct "footer" [] footer]),
+     if null footerdoc
+       then []
+       else [hrule, footer footerdoc]),
    -- JavaScript includes placed at the end so page loads faster:
-   HtmlStruct "script" [("src",rootdir++"/js/jquery.min.js")] [],
-   HtmlStruct "script" [("src",rootdir++"/js/bootstrap.min.js")] []]
+   htmlStruct "script" [("src",rootdir++"/js/jquery.min.js")] [],
+   htmlStruct "script" [("src",rootdir++"/js/bootstrap.min.js")] []]
  where
   bsCols n = "col-sm-" ++ show n ++ " " ++ "col-md-" ++ show n
   
   -- header row:
   headerRow = if null header
-              then []
-              else [HtmlStruct "header" [("class","jumbotron")] header]
+                then []
+                else [htmlStruct "header" [("class","jumbotron")] header]
 
 
 -- Navigation bar at the top. The first argument is a header element
 -- put at the left, the second and third arguments are the left
 -- and right menus which will be collapsed if the page is two small.
-topNavigationBar :: (String,[HtmlExp]) -> [[HtmlExp]] -> [[HtmlExp]]
-                 -> [HtmlExp]
+topNavigationBar :: HTML h => (String,[h]) -> [[h]] -> [[h]] -> [h]
 topNavigationBar (brandurl,brandtitle) leftmenu rightmenu =
   [blockstyle "navbar navbar-inverse navbar-fixed-top"
     [blockstyle "container-fluid"
       [blockstyle "navbar-header"
-         [HtmlStruct "button"
+         [htmlStruct "button"
            [("type","button"),("class","navbar-toggle collapsed"),
             ("data-toggle","collapse"),("data-target","#topnavbar"),
             ("aria-expanded","false"),("aria-controls","topnavbar")]
@@ -105,18 +104,18 @@ topNavigationBar (brandurl,brandtitle) leftmenu rightmenu =
             textstyle "icon-bar" "",
             textstyle "icon-bar" ""],
           href brandurl brandtitle `addClass` "navbar-brand"],
-        HtmlStruct "div" [("id","topnavbar"),
+        htmlStruct "div" [("id","topnavbar"),
                           ("class","collapse navbar-collapse")]
          ([ulist leftmenu `addClass` "nav navbar-nav"] ++
           if null rightmenu then []
           else [ulist rightmenu `addClass` "nav navbar-nav navbar-right"])]]]
 
 -- Create a side menu containing a title and a list of items:
-titledSideMenu :: String -> [[HtmlExp]] -> [HtmlExp]
+titledSideMenu :: HTML h => String -> [[h]] -> [h]
 titledSideMenu title items =
   (if null title
-   then []
-   else [HtmlStruct "small" [] [htxt title]]) ++
+     then []
+     else [htmlStruct "small" [] [htxt title]]) ++
   [ulist items `addClass` "nav nav-sidebar"]
 
 ----------------------------------------------------------------------------
@@ -138,69 +137,69 @@ primButton label handler =
   button label handler `addClass` "btn btn-primary"
 
 --- Hypertext reference rendered as a default button.
-hrefDefaultButton :: String -> [HtmlExp] -> HtmlExp
+hrefDefaultButton :: HTML h => String -> [h] -> h
 hrefDefaultButton ref hexps =
   href ref hexps `addClass` "btn btn-default"
 
 --- Hypertext reference rendered as a small button.
-hrefSmallButton :: String -> [HtmlExp] -> HtmlExp
+hrefSmallButton :: HTML h => String -> [h] -> h
 hrefSmallButton ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-default"
 
-hrefButton :: String -> [HtmlExp] -> HtmlExp
+hrefButton :: HTML h => String -> [h] -> h
 hrefButton = hrefSmallButton
 
 --- Hypertext reference rendered as a primary button.
-hrefPrimButton :: String -> [HtmlExp] -> HtmlExp
+hrefPrimButton :: HTML h => String -> [h] -> h
 hrefPrimButton ref hexps =
   href ref hexps `addClass` "btn btn-primary"
 
 --- Hypertext reference rendered as an info button.
-hrefInfoButton :: String -> [HtmlExp] -> HtmlExp
+hrefInfoButton :: HTML h => String -> [h] -> h
 hrefInfoButton ref hexps =
   href ref hexps `addClass` "btn btn-info"
 
 --- Hypertext reference rendered as a success button.
-hrefSuccessButton :: String -> [HtmlExp] -> HtmlExp
+hrefSuccessButton :: HTML h => String -> [h] -> h
 hrefSuccessButton ref hexps =
   href ref hexps `addClass` "btn btn-success"
 
 --- Hypertext reference rendered as a warning button.
-hrefWarningButton :: String -> [HtmlExp] -> HtmlExp
+hrefWarningButton :: HTML h => String -> [h] -> h
 hrefWarningButton ref hexps =
   href ref hexps `addClass` "btn btn-warning"
 
 --- Hypertext reference rendered as a danger button.
-hrefDangerButton :: String -> [HtmlExp] -> HtmlExp
+hrefDangerButton :: HTML h => String -> [h] -> h
 hrefDangerButton ref hexps =
   href ref hexps `addClass` "btn btn-danger"
 
 --- Hypertext reference rendered as a block level button.
-hrefBlock :: String -> [HtmlExp] -> HtmlExp
+hrefBlock :: HTML h => String -> [h] -> h
 hrefBlock ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-block"
 
 --- Hypertext reference rendered as an info block level button.
-hrefInfoBlock :: String -> [HtmlExp] -> HtmlExp
+hrefInfoBlock :: HTML h => String -> [h] -> h
 hrefInfoBlock ref hexps =
   href ref hexps `addClass` "btn btn-info btn-block"
 
 ----------------------------------------------------------------------------
 -- Some icons:
 
-glyphicon :: String -> HtmlExp
+glyphicon :: HTML h => String -> h
 glyphicon n = textstyle ("glyphicon glyphicon-"++n) ""
 
-homeIcon :: HtmlExp
+homeIcon :: HTML h => h
 homeIcon   = glyphicon "home"
 
-userIcon :: HtmlExp
+userIcon :: HTML h => h
 userIcon   = glyphicon "user"
 
-loginIcon :: HtmlExp
+loginIcon :: HTML h => h
 loginIcon  = glyphicon "log-in"
 
-logoutIcon :: HtmlExp
+logoutIcon :: HTML h => h
 logoutIcon = glyphicon "log-out"
 
 ----------------------------------------------------------------------------

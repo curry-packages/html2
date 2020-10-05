@@ -1,12 +1,10 @@
 ------------------------------------------------------------------------------
 --- This library provides functions to categorize a list of entities
 --- into a HTML page with an index access (e.g., "A-Z") to these entities.
----
---- @category web
 ------------------------------------------------------------------------------
 
 module HTML.CategorizedList
-  (list2CategorizedHtml, categorizeByItemKey, stringList2ItemList)
+  ( list2CategorizedHtml, categorizeByItemKey, stringList2ItemList )
  where
 
 import Char
@@ -25,8 +23,8 @@ import HTML.Base
 --- @param categoryFun uses the keys of the items and the keys of the
 --- categories to distribute the items among the categories.
 --- @return Html containing inner links between the categories
-list2CategorizedHtml :: Show b => [(a,[HtmlExp])] -> [(b,String)] -> (a -> b -> Bool)
-                        -> [HtmlExp]
+list2CategorizedHtml ::
+  (HTML h, Show b) => [(a,[h])] -> [(b,String)] -> (a -> b -> Bool) -> [h]
 list2CategorizedHtml itemL categoryL categoryFun =
    categories2LinkList categoryL :
    map (\ (categoryKey,categoryString) ->
@@ -41,7 +39,7 @@ list2CategorizedHtml itemL categoryL categoryFun =
         categoryL
 
 -- the navigation list
-categories2LinkList :: Show a => [(a,String)] -> HtmlExp
+categories2LinkList :: (HTML h, Show a) => [(a,String)] -> h
 categories2LinkList categoryL =
   par
   [center
@@ -56,7 +54,7 @@ categories2LinkList categoryL =
 --- @param itemL  the list of key-item pairs which are supposed to be
 --- categorized with respect to key
 --- @return Html containing inner links between the categories
-categorizeByItemKey :: [(String,[HtmlExp])] -> [HtmlExp]
+categorizeByItemKey :: HTML h => [(String,[h])] -> [h]
 categorizeByItemKey itemL =
    list2CategorizedHtml
        itemL 
@@ -65,7 +63,7 @@ categorizeByItemKey itemL =
 
 --- Convert a string list into an key-item list
 --- The strings are used as keys and for the simple text layout.
-stringList2ItemList :: [String] -> [(String,[HtmlExp])]
+stringList2ItemList :: HTML h => [String] -> [(String,[h])]
 stringList2ItemList = map (\str -> (str,[htxt str]))
 
 -- yields every listHead only once
@@ -78,14 +76,17 @@ categorizeStringHead :: String -> Char -> Bool
 categorizeStringHead [] _ = False
 categorizeStringHead (c:_) c' = isUpperEqual c c'
 
+isUpperEqual :: Char -> Char -> Bool
 isUpperEqual c c' = toUpper c == toUpper c'
 
 
 -- just for testing ----------------------------------------
 
+main :: IO HtmlPage
 main = return $ page "CatTest"
                      (categorizeByItemKey (stringList2ItemList testList))
 
+testList :: [String]
 testList = ["bbcd",
             "acde",
             "ab",
@@ -100,4 +101,5 @@ testList = ["bbcd",
             "mxt",
             "mxtr"]
 
--- curry2cgi -o ~/public_html/cat.cgi CategorizedHtmlList
+-- To test, export `main` and run:
+-- > cypm exec curry2cgi -o ~/public_html/cgi-bin/cat.cgi HTML.CategorizedList

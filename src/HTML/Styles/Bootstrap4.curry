@@ -3,7 +3,7 @@
 --- rendered with [Bootstrap version 4](https://getbootstrap.com/).
 ---
 --- @author Michael Hanus
---- @version July 2020
+--- @version September 2020
 ----------------------------------------------------------------------------
 
 module HTML.Styles.Bootstrap4
@@ -45,9 +45,9 @@ import HTML.Base
 --- @param header   - the main header (will be rendered with jumbotron style)
 --- @param contents - the main contents of the document
 --- @param footer   - the footer of the document
-bootstrapPage :: String -> [String] -> [String] -> String -> (String,[HtmlExp])
-              -> [[HtmlExp]] -> [[HtmlExp]] -> Int -> [HtmlExp] -> [HtmlExp]
-              -> [HtmlExp] -> [HtmlExp] -> HtmlPage
+bootstrapPage :: String -> [String] -> [String] -> String -> (String,[BaseHtml])
+              -> [[BaseHtml]] -> [[BaseHtml]] -> Int -> [BaseHtml] -> [BaseHtml]
+              -> [BaseHtml] -> [BaseHtml] -> HtmlPage
 bootstrapPage favicon styles jsincludes title brandurltitle lefttopmenu
               righttopmenu leftcols sidemenu header contents footer =
   bootstrapPage2 favicon styles jsincludes title brandurltitle
@@ -76,10 +76,10 @@ bootstrapPage favicon styles jsincludes title brandurltitle lefttopmenu
 --- @param header   - the main header (will be rendered with jumbotron style)
 --- @param contents - the main contents of the document
 --- @param footer   - the footer of the document
-bootstrapPage2 :: String -> [String] -> [String] -> String -> (String,[HtmlExp])
-               -> [(String,[HtmlExp])] -> [(String,[HtmlExp])]
-               -> Int -> [HtmlExp] -> [HtmlExp]
-               -> [HtmlExp] -> [HtmlExp] -> HtmlPage
+bootstrapPage2 :: String -> [String] -> [String] -> String
+               -> (String,[BaseHtml]) -> [(String,[BaseHtml])]
+               -> [(String,[BaseHtml])] -> Int -> [BaseHtml] -> [BaseHtml]
+               -> [BaseHtml] -> [BaseHtml] -> HtmlPage
 bootstrapPage2 favicon styles jsincludes title brandurltitle
   lefttopmenu righttopmenu leftcols sidemenu header contents footer =
   HtmlPage title
@@ -100,12 +100,11 @@ bootstrapPage2 favicon styles jsincludes title brandurltitle
            else [pageLinkInfo [("rel","shortcut icon"), ("href",favicon)]]
 
 --- Create body of HTML page. Used by `bootstrapPage`.
-bootstrapBody :: [String] -> (String,[HtmlExp])
-              -> [(String,[HtmlExp])] -> [(String,[HtmlExp])]
-              -> Int -> [HtmlExp] -> [HtmlExp]
-              -> [HtmlExp] -> [HtmlExp] -> [HtmlExp]
+bootstrapBody ::
+  HTML h => [String] -> (String,[h]) -> [(String,[h])] -> [(String,[h])]
+         -> Int -> [h] -> [h] -> [h] -> [h] -> [h]
 bootstrapBody jsincludes brandurltitle lefttopmenu righttopmenu
-              leftcols sidemenu header contents footer =
+              leftcols sidemenu header contents footerdoc =
   topNavigationBar brandurltitle lefttopmenu righttopmenu ++
   [blockstyle "container-fluid"
      ([blockstyle "row"
@@ -116,31 +115,30 @@ bootstrapBody jsincludes brandurltitle lefttopmenu righttopmenu
                    [blockstyle "card" sidemenu],
                  blockstyle (bsCols (12-leftcols))
                    (headerRow ++ contents)])] ++
-       if null footer
-        then []
-        else [hrule, HtmlStruct "footer" [] footer])] ++
+       if null footerdoc
+         then []
+         else [hrule, footer footerdoc])] ++
    -- JavaScript includes placed at the end so page loads faster:
-  map (\n -> HtmlStruct "script" [("src",n)] []) jsincludes
+  map (\n -> htmlStruct "script" [("src",n)] []) jsincludes
  where
   bsCols n = "col-sm-" ++ show n ++ " " ++ "col-md-" ++ show n
   
   -- header row:
   headerRow = if null header
                 then []
-                else [HtmlStruct "header" [("class","jumbotron")] header]
+                else [htmlStruct "header" [("class","jumbotron")] header]
 
 
 -- Navigation bar at the top. The first argument is a header element
 -- put at the left, the second and third arguments are the left
 -- and right menus which will be collapsed if the page is two small.
-topNavigationBar :: (String,[HtmlExp])
-                 -> [(String,[HtmlExp])] -> [(String,[HtmlExp])]
-                 -> [HtmlExp]
+topNavigationBar ::
+  HTML h =>  (String,[h]) -> [(String,[h])] -> [(String,[h])] -> [h]
 topNavigationBar (brandurl,brandtitle) leftmenu rightmenu =
-  [HtmlStruct "nav"
+  [htmlStruct "nav"
     [("class","navbar navbar-expand-md navbar-dark fixed-top bg-dark")]
     [href brandurl brandtitle `addClass` "navbar-brand",
-     HtmlStruct "button"
+     htmlStruct "button"
        [("type","button"),("class","navbar-toggler"),
         ("data-toggle","collapse"),
         ("data-target","#topnavbar"),
@@ -148,7 +146,7 @@ topNavigationBar (brandurl,brandtitle) leftmenu rightmenu =
         ("aria-controls","topnavbar"),
         ("aria-label","Toggle navigation")]
        [textstyle "navbar-toggler-icon" ""],
-     HtmlStruct "div" [("id","topnavbar"),
+     htmlStruct "div" [("id","topnavbar"),
                        ("class","collapse navbar-collapse")] $
        [ulistWithItemClass "navbar-nav mr-auto" leftmenu] ++
        if null rightmenu
@@ -156,11 +154,11 @@ topNavigationBar (brandurl,brandtitle) leftmenu rightmenu =
          else [ulistWithItemClass "navbar-nav navbar-right" rightmenu]]]
 
 --- Create a side menu containing a title and a list of items:
-titledSideMenu :: String -> [[HtmlExp]] -> [HtmlExp]
+titledSideMenu :: HTML h => String -> [[h]] -> [h]
 titledSideMenu title items =
   (if null title
      then []
-     else [HtmlStruct "h5" [] [htxt title]]) ++
+     else [h5 [htxt title]]) ++
   [ulistWithClass "nav flex-column" "nav-item" items]
 
 ----------------------------------------------------------------------------
@@ -200,113 +198,113 @@ infoSmButton label handler =
 -- Renderings for hypertext references.
 
 --- Hypertext reference rendered as a primary button.
-hrefPrimButton :: String -> [HtmlExp] -> HtmlExp
+hrefPrimButton :: HTML h => String -> [h] -> h
 hrefPrimButton ref hexps =
   href ref hexps `addClass` "btn btn-primary"
 
 --- Hypertext reference rendered as a small primary button.
-hrefPrimSmButton :: String -> [HtmlExp] -> HtmlExp
+hrefPrimSmButton :: HTML h => String -> [h] -> h
 hrefPrimSmButton ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-primary"
 
 --- Hypertext reference rendered as a secondary button.
-hrefScndButton :: String -> [HtmlExp] -> HtmlExp
+hrefScndButton :: HTML h => String -> [h] -> h
 hrefScndButton ref hexps =
   href ref hexps `addClass` "btn btn-secondary"
 
 --- Hypertext reference rendered as a small secondary button.
-hrefScndSmButton :: String -> [HtmlExp] -> HtmlExp
+hrefScndSmButton :: HTML h => String -> [h] -> h
 hrefScndSmButton ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-secondary"
 
 --- Hypertext reference rendered as an info button.
-hrefInfoButton :: String -> [HtmlExp] -> HtmlExp
+hrefInfoButton :: HTML h => String -> [h] -> h
 hrefInfoButton ref hexps =
   href ref hexps `addClass` "btn btn-info"
 
 --- Hypertext reference rendered as a small secondary button.
-hrefInfoSmButton :: String -> [HtmlExp] -> HtmlExp
+hrefInfoSmButton :: HTML h => String -> [h] -> h
 hrefInfoSmButton ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-info"
 
 --- Hypertext reference rendered as a success button.
-hrefSuccButton :: String -> [HtmlExp] -> HtmlExp
+hrefSuccButton :: HTML h => String -> [h] -> h
 hrefSuccButton ref hexps =
   href ref hexps `addClass` "btn btn-success"
 
 --- Hypertext reference rendered as a small success button.
-hrefSuccSmButton :: String -> [HtmlExp] -> HtmlExp
+hrefSuccSmButton :: HTML h => String -> [h] -> h
 hrefSuccSmButton ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-success"
 
 --- Hypertext reference rendered as a warning button.
-hrefWarnButton :: String -> [HtmlExp] -> HtmlExp
+hrefWarnButton :: HTML h => String -> [h] -> h
 hrefWarnButton ref hexps =
   href ref hexps `addClass` "btn btn-warning"
 
 --- Hypertext reference rendered as a small warning button.
-hrefWarnSmButton :: String -> [HtmlExp] -> HtmlExp
+hrefWarnSmButton :: HTML h => String -> [h] -> h
 hrefWarnSmButton ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-warning"
 
 --- Hypertext reference rendered as a danger button.
-hrefDangButton :: String -> [HtmlExp] -> HtmlExp
+hrefDangButton :: HTML h => String -> [h] -> h
 hrefDangButton ref hexps =
   href ref hexps `addClass` "btn btn-danger"
 
 --- Hypertext reference rendered as a small danger button.
-hrefDangSmButton :: String -> [HtmlExp] -> HtmlExp
+hrefDangSmButton :: HTML h => String -> [h] -> h
 hrefDangSmButton ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-danger"
 
 --- Hypertext reference rendered as a light button.
-hrefLightButton :: String -> [HtmlExp] -> HtmlExp
+hrefLightButton :: HTML h => String -> [h] -> h
 hrefLightButton ref hexps =
   href ref hexps `addClass` "btn btn-light"
 
 --- Hypertext reference rendered as a small light button.
-hrefLightSmButton :: String -> [HtmlExp] -> HtmlExp
+hrefLightSmButton :: HTML h => String -> [h] -> h
 hrefLightSmButton ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-light"
 
 --- Hypertext reference rendered as a dark button.
-hrefDarkButton :: String -> [HtmlExp] -> HtmlExp
+hrefDarkButton :: HTML h => String -> [h] -> h
 hrefDarkButton ref hexps =
   href ref hexps `addClass` "btn btn-dark"
 
 --- Hypertext reference rendered as a small dark button.
-hrefDarkSmButton :: String -> [HtmlExp] -> HtmlExp
+hrefDarkSmButton :: HTML h => String -> [h] -> h
 hrefDarkSmButton ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-dark"
 
 
 -- Hypertext reference rendered as a primary block button.
-hrefPrimBlock :: String -> [HtmlExp] -> HtmlExp
+hrefPrimBlock :: HTML h => String -> [h] -> h
 hrefPrimBlock ref hexps =
   href ref hexps `addClass` "btn btn-primary btn-block"
 
 -- Hypertext reference rendered as a secondary block button.
-hrefScndBlock :: String -> [HtmlExp] -> HtmlExp
+hrefScndBlock :: HTML h => String -> [h] -> h
 hrefScndBlock ref hexps =
   href ref hexps `addClass` "btn btn-secondary btn-block"
 
 --- Hypertext reference rendered as an info block button.
-hrefInfoBlock :: String -> [HtmlExp] -> HtmlExp
+hrefInfoBlock :: HTML h => String -> [h] -> h
 hrefInfoBlock ref hexps =
   href ref hexps `addClass` "btn btn-info btn-block"
 
 -- Hypertext reference rendered as a small primary block button.
-hrefPrimSmBlock :: String -> [HtmlExp] -> HtmlExp
+hrefPrimSmBlock :: HTML h => String -> [h] -> h
 hrefPrimSmBlock ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-primary btn-block"
 
 -- Hypertext reference rendered as a small secondary block button.
-hrefScndSmBlock :: String -> [HtmlExp] -> HtmlExp
+hrefScndSmBlock :: HTML h => String -> [h] -> h
 hrefScndSmBlock ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-secondary btn-block"
 
 -- Hypertext reference rendered as a small info block button.
-hrefInfoSmBlock :: String -> [HtmlExp] -> HtmlExp
+hrefInfoSmBlock :: HTML h => String -> [h] -> h
 hrefInfoSmBlock ref hexps =
   href ref hexps `addClass` "btn btn-sm btn-info btn-block"
 
@@ -314,98 +312,98 @@ hrefInfoSmBlock ref hexps =
 -- Badges
 
 --- Hypertext reference rendered as a primary badge.
-hrefPrimBadge :: String -> [HtmlExp] -> HtmlExp
+hrefPrimBadge :: HTML h => String -> [h] -> h
 hrefPrimBadge ref hexps = href ref hexps `addClass` "badge badge-primary"
 
 --- Hypertext reference rendered as a secondary badge.
-hrefScndBadge :: String -> [HtmlExp] -> HtmlExp
+hrefScndBadge :: HTML h => String -> [h] -> h
 hrefScndBadge ref hexps = href ref hexps `addClass` "badge badge-secondary"
 
 --- Hypertext reference rendered as a success badge.
-hrefSuccBadge :: String -> [HtmlExp] -> HtmlExp
+hrefSuccBadge :: HTML h => String -> [h] -> h
 hrefSuccBadge ref hexps = href ref hexps `addClass` "badge badge-success"
 
 --- Hypertext reference rendered as an info badge.
-hrefInfoBadge :: String -> [HtmlExp] -> HtmlExp
+hrefInfoBadge :: HTML h => String -> [h] -> h
 hrefInfoBadge ref hexps = href ref hexps `addClass` "badge badge-info"
 
 --- Hypertext reference rendered as a warning badge.
-hrefWarnBadge :: String -> [HtmlExp] -> HtmlExp
+hrefWarnBadge :: HTML h => String -> [h] -> h
 hrefWarnBadge ref hexps = href ref hexps `addClass` "badge badge-warning"
 
 --- Hypertext reference rendered as a danger badge.
-hrefDangBadge :: String -> [HtmlExp] -> HtmlExp
+hrefDangBadge :: HTML h => String -> [h] -> h
 hrefDangBadge ref hexps = href ref hexps `addClass` "badge badge-danger"
 
 --- Hypertext reference rendered as a light badge.
-hrefLightBadge :: String -> [HtmlExp] -> HtmlExp
+hrefLightBadge :: HTML h => String -> [h] -> h
 hrefLightBadge ref hexps = href ref hexps `addClass` "badge badge-light"
 
 --- Hypertext reference rendered as a dark badge.
-hrefDarkBadge :: String -> [HtmlExp] -> HtmlExp
+hrefDarkBadge :: HTML h => String -> [h] -> h
 hrefDarkBadge ref hexps = href ref hexps `addClass` "badge badge-dark"
 
 --- External hypertext reference rendered as a primary badge.
-ehrefPrimBadge :: String -> [HtmlExp] -> HtmlExp
+ehrefPrimBadge :: HTML h => String -> [h] -> h
 ehrefPrimBadge ref hexps = eTarget $ hrefPrimBadge ref hexps
 
 --- External hypertext reference rendered as a secondary badge.
-ehrefScndBadge :: String -> [HtmlExp] -> HtmlExp
+ehrefScndBadge :: HTML h => String -> [h] -> h
 ehrefScndBadge ref hexps = eTarget $ hrefScndBadge ref hexps
 
 --- External hypertext reference rendered as a success badge.
-ehrefSuccBadge :: String -> [HtmlExp] -> HtmlExp
+ehrefSuccBadge :: HTML h => String -> [h] -> h
 ehrefSuccBadge ref hexps = eTarget $ hrefSuccBadge ref hexps
 
 --- External hypertext reference rendered as an info badge.
-ehrefInfoBadge :: String -> [HtmlExp] -> HtmlExp
+ehrefInfoBadge :: HTML h => String -> [h] -> h
 ehrefInfoBadge ref hexps = eTarget $ hrefInfoBadge ref hexps
 
 --- External hypertext reference rendered as a warning badge.
-ehrefWarnBadge :: String -> [HtmlExp] -> HtmlExp
+ehrefWarnBadge :: HTML h => String -> [h] -> h
 ehrefWarnBadge ref hexps = eTarget $ hrefWarnBadge ref hexps
 
 --- External hypertext reference rendered as a danger badge.
-ehrefDangBadge :: String -> [HtmlExp] -> HtmlExp
+ehrefDangBadge :: HTML h => String -> [h] -> h
 ehrefDangBadge ref hexps = eTarget $ hrefDangBadge ref hexps
 
 --- External hypertext reference rendered as a light badge.
-ehrefLightBadge :: String -> [HtmlExp] -> HtmlExp
+ehrefLightBadge :: HTML h => String -> [h] -> h
 ehrefLightBadge ref hexps = eTarget $ hrefLightBadge ref hexps
 
 --- External hypertext reference rendered as a dark badge.
-ehrefDarkBadge :: String -> [HtmlExp] -> HtmlExp
+ehrefDarkBadge :: HTML h => String -> [h] -> h
 ehrefDarkBadge ref hexps = eTarget $ hrefDarkBadge ref hexps
 
 ----------------------------------------------------------------------------
 -- Navigation links
 
 --- Hypertext reference in navigations.
-hrefNav :: String -> [HtmlExp] -> HtmlExp
+hrefNav :: HTML h => String -> [h] -> h
 hrefNav url hexp = href url hexp `addClass` "nav-link"
 
 --- Active hypertext reference in navigations.
-hrefNavActive :: String -> [HtmlExp] -> HtmlExp
+hrefNavActive :: HTML h => String -> [h] -> h
 hrefNavActive url hexp = ehref url hexp `addClass` "nav-link active"
 
 --- External hypertext reference in navigations.
-ehrefNav :: String -> [HtmlExp] -> HtmlExp
+ehrefNav :: HTML h => String -> [h] -> h
 ehrefNav url hexp = ehref url hexp `addClass` "nav-link"
 
 --- An external hypertext reference which opens on a new page.
-ehref :: String -> [HtmlExp] -> HtmlExp
+ehref :: HTML h => String -> [h] -> h
 ehref ref hexp = eTarget $ href ref hexp
 
 --- Transforms a hypertext reference into an external one
 --- which opens on a new page.
 --- Basically, the attribute `target="_blank"` is added.
-eTarget :: HtmlExp -> HtmlExp
+eTarget :: HTML h => h -> h
 eTarget hexp = hexp `addAttr` ("target","_blank")
 
 --------------------------------------------------------------------------
 
 --- Render an HTML expression as keyboard or user input.
-kbdInput :: [HtmlExp] -> HtmlExp
-kbdInput = HtmlStruct "kbd" []
+kbdInput :: HTML h => [h] -> h
+kbdInput = htmlStruct "kbd" []
 
 ----------------------------------------------------------------------------

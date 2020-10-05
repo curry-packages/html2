@@ -7,15 +7,15 @@
 --- to hold some session-specific data.
 ---
 --- @author Michael Hanus
---- @version August 2020
+--- @version September 2020
 ------------------------------------------------------------------------------
 
 module HTML.Session
   ( sessionDataDir, inSessionDataDir
   , sessionCookie, doesSessionExist, withSessionCookie, withSessionCookieInfo
   , SessionStore, emptySessionStore
-  , getSessionMaybeData, getSessionData, putSessionData, removeSessionData
-  , updateSessionData
+  , getSessionMaybeData, getSessionData
+  , writeSessionData, removeSessionData, modifySessionData
   ) where
 
 import Directory    ( createDirectory, doesDirectoryExist )
@@ -143,7 +143,7 @@ withSessionCookieInfo p = do
 cookieInfoPage :: IO HtmlPage
 cookieInfoPage = do
   urlparam <- getUrlParameter
-  withSessionCookie $ standardPage "Cookie Info"
+  withSessionCookie $ headerPage "Cookie Info"
     [ par [ htxt $ "This web site uses cookies for navigation and user " ++
                    "inputs and preferences. In order to proceed, "
           , bold [href ('?' : urlparam) [htxt "please click here."]]]]
@@ -163,8 +163,8 @@ emptySessionStore = SessionStore []
 
 --- Retrieves data for the current user session stored in a session store.
 --- Returns `Nothing` if there is no data for the current session.
-getSessionMaybeData :: Global (SessionStore a) -> IO (Maybe a)
-getSessionMaybeData sessionData = do
+getSessionMaybeData :: Global (SessionStore a) -> FormReader (Maybe a)
+getSessionMaybeData sessionData = toFormReader $ do
   ensureSessionDataDir
   sid <- getSessionId
   SessionStore sdata <- safeReadGlobal sessionData emptySessionStore
@@ -175,17 +175,17 @@ getSessionMaybeData sessionData = do
       then Just storedData
       else findInSession si rest
   findInSession _ [] = Nothing
-      
+
 --- Retrieves data for the current user session stored in a session store
 --- where the second argument is returned if there is no data
 --- for the current session.
-getSessionData :: Global (SessionStore a) -> a -> IO a
-getSessionData sessionData defaultdata =
-  getSessionMaybeData sessionData >>= return . fromMaybe defaultdata
+getSessionData :: Global (SessionStore a) -> a -> FormReader a
+getSessionData sessiondata defaultdata =
+  liftM (fromMaybe defaultdata) (getSessionMaybeData sessiondata)
 
 --- Stores data related to the current user session in a session store.
-putSessionData :: Global (SessionStore a) -> a -> IO ()
-putSessionData sessionData newData = do
+writeSessionData :: Global (SessionStore a) -> a -> IO ()
+writeSessionData sessionData newData = do
   ensureSessionDataDir
   sid <- getSessionId
   SessionStore sdata <- safeReadGlobal sessionData emptySessionStore
@@ -200,11 +200,11 @@ putSessionData sessionData newData = do
                   (SessionStore ((sid, clockTimeToInt currentTime, newData)
                                   : cleanup currentTime sdata))
 
---- Updates the data of the current user session.
-updateSessionData :: Global (SessionStore a) -> a -> (a -> a) -> IO ()
-updateSessionData sessiondata defaultdata upd = do
-  sd <- getSessionData sessiondata defaultdata
-  putSessionData sessiondata (upd sd)
+--- Modifies the data of the current user session.
+modifySessionData :: Global (SessionStore a) -> a -> (a -> a) -> IO ()
+modifySessionData sessiondata defaultdata upd = do
+  sd <- fromFormReader $ getSessionData sessiondata defaultdata
+  writeSessionData sessiondata (upd sd)
 
 --- Removes data related to the current user session from a session store.
 removeSessionData :: Global (SessionStore a) -> IO ()

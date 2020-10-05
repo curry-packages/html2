@@ -6,7 +6,7 @@
 -- Subdirectories are presented as links to browse them.
 --
 -- @author Michael Hanus
--- @version November 2018
+-- @version September 2020
 ------------------------------------------------------------------------------
 
 import Directory
@@ -24,13 +24,13 @@ main = do
 
 -- Transform directory and entry in this directory into a link
 -- (if it is a directory) or a text:
-entry2html :: String -> String -> IO [HtmlExp]
+entry2html :: String -> String -> IO [BaseHtml]
 entry2html dir e = do
   direx <- doesDirectoryExist (dir ++ "/" ++ e)
   if direx
-   then return [href ("?" ++ string2urlencoded (dir ++ "/" ++ e))
-                     [htxt e]]
-   else return [htxt e]
+    then return [href ("?" ++ string2urlencoded (dir ++ "/" ++ e))
+                      [htxt e]]
+    else return [htxt e]
 
 -- Install with:
 -- > cypm exec curry2cgi -o ~/public_html/cgi-bin/browsedir.cgi BrowseDir
