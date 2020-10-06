@@ -2,11 +2,11 @@
 --- This module contains a very simple parser for HTML documents.
 ---
 --- @author Michael Hanus
---- @version October 2017
---- @category web
+--- @version October 2020
 ------------------------------------------------------------------------------
 
-module HTML.Parser(readHtmlFile,parseHtmlString) where
+module HTML.Parser ( readHtmlFile, parseHtmlString )
+ where
 
 import Char
 import HTML.Base
@@ -15,14 +15,14 @@ import HTML.Base
 --- @param file - the name of a file containing HTML text
 --- @return a list of HTML expressions (if the file contains exactly one
 ---         HTML document, this list should contain exactly one element)
-readHtmlFile :: String -> IO [HtmlExp]
+readHtmlFile :: String -> IO [BaseHtml]
 readHtmlFile file = readFile file >>= return . parseHtmlString
 
 ------------------------------------------------------------------------------
 --- Transforms an HTML string into a list of HTML expressions.
 --- If the HTML string is a well structured document, the list
 --- of HTML expressions should contain exactly one element.
-parseHtmlString :: String -> [HtmlExp]
+parseHtmlString :: String -> [BaseHtml]
 parseHtmlString s = reverse (parseHtmlTokens [] (scanHtmlString s))
 
 --- The data type for representing HTML tokens.
@@ -30,32 +30,32 @@ data HtmlToken = HText String | HElem String [(String,String)]
 
 -- parse a list of HTML tokens into list of HTML expressions:
 -- (first argument "helems" is a stack of already read tokens)
-parseHtmlTokens :: [HtmlExp] -> [HtmlToken] -> [HtmlExp]
+parseHtmlTokens :: [BaseHtml] -> [HtmlToken] -> [BaseHtml]
 parseHtmlTokens helems [] = helems
 parseHtmlTokens helems (HText s : hs) =
- parseHtmlTokens (HtmlText s : helems) hs
+ parseHtmlTokens (BaseText s : helems) hs
 parseHtmlTokens helems (HElem (t:ts) args : hs) =
  if t == '/'
  then let (structargs,elems,rest) = splitHtmlElems ts helems
-      in parseHtmlTokens ([HtmlStruct ts structargs elems] ++ rest) hs
- else parseHtmlTokens (HtmlStruct (t:ts) args [] : helems) hs
+      in parseHtmlTokens ([BaseStruct ts structargs elems] ++ rest) hs
+ else parseHtmlTokens (BaseStruct (t:ts) args [] : helems) hs
 
 
 -- split the HTML token stack up to a particular token:
-splitHtmlElems :: String -> [HtmlExp]
-               -> ([(String,String)],[HtmlExp],[HtmlExp])
+splitHtmlElems :: String -> [BaseHtml]
+               -> ([(String,String)],[BaseHtml],[BaseHtml])
 splitHtmlElems _ [] = ([],[],[])
-splitHtmlElems tag (HtmlText s : hs) =
+splitHtmlElems tag (BaseText s : hs) =
  let (largs,elems,rest) = splitHtmlElems tag hs
- in (largs, elems ++ [HtmlText s], rest)
-splitHtmlElems tag (HtmlStruct s args cont@(_:_) : hs) =
+ in (largs, elems ++ [BaseText s], rest)
+splitHtmlElems tag (BaseStruct s args cont@(_:_) : hs) =
  let (largs,elems,rest) = splitHtmlElems tag hs
- in (largs, elems ++ [HtmlStruct s args cont], rest)
-splitHtmlElems tag (HtmlStruct s args []: hs) =
+ in (largs, elems ++ [BaseStruct s args cont], rest)
+splitHtmlElems tag (BaseStruct s args []: hs) =
  if tag==s
- then (args,[],hs)
- else let (largs,elems,rest) = splitHtmlElems tag hs
-      in  (largs, elems ++ [HtmlStruct s args []], rest)
+   then (args,[],hs)
+   else let (largs,elems,rest) = splitHtmlElems tag hs
+        in  (largs, elems ++ [BaseStruct s args []], rest)
 
 
 -- scan an HTML string into list of HTML tokens:

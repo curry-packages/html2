@@ -23,7 +23,7 @@
 {-# OPTIONS_CYMAKE -Wno-incomplete-patterns #-}
 
 module HTML.Base
- ( HTML, htmlText, htmlStruct, hStruct, updAttrs,
+ ( HTML, htmlText, htmlStruct, hStruct, updAttrs, toBaseHtml,
    HtmlExp(..), BaseHtml(..), toHtmlExp, fromHtmlExp, textOf,
    HtmlPage(..), PageParam(..),
    FormReader, fromFormReader, toFormReader,
@@ -101,11 +101,14 @@ updBaseAttrs _ (BaseAction act)             = BaseAction act
 
 --- A type is an instance of class `HTML` if it has operations to construct
 --- HTML documents, i.e., constructors for basic text strings and
---- structures with tags and attributes.
+--- structures with tags and attributes, update the attributes in
+--- structures, and extracting the basic HTML structure, i.e.,
+--- transforming a document into a basic HTML document.
 class HTML a where
   htmlText   :: String -> a
   htmlStruct :: String -> Attrs -> [a] -> a
   updAttrs   :: (Attrs -> Attrs) -> a -> a
+  toBaseHtml :: a -> BaseHtml
 
 --- An HTML structure with a given tag and no attributes.
 hStruct :: HTML h => String -> [h] -> h
@@ -116,6 +119,7 @@ instance HTML BaseHtml where
   htmlText   = BaseText
   htmlStruct = BaseStruct
   updAttrs   = updBaseAttrs
+  toBaseHtml = id
 
 ------------------------------------------------------------------------------
 -- CGI references and environments.
@@ -166,12 +170,6 @@ updHtmlAttrs f (HtmlEvent ref handler he)   =
 updHtmlAttrs f (HtmlCRef ref he)            = HtmlCRef ref (updHtmlAttrs f he)
 updHtmlAttrs _ (HtmlAction act)             = HtmlAction act
 
---- The type of HTML expressions is an instance of class `HTML`.
-instance HTML HtmlExp where
-  htmlText   = HtmlText
-  htmlStruct = HtmlStruct
-  updAttrs   = updHtmlAttrs
-
 --- Transforms a static into a dynamic HTML document.
 toHtmlExp :: BaseHtml -> HtmlExp
 toHtmlExp (BaseText s)         = HtmlText s
@@ -186,6 +184,13 @@ fromHtmlExp (HtmlStruct t ps hs) = BaseStruct t ps (map fromHtmlExp hs)
 fromHtmlExp (HtmlAction a)       = BaseAction a
 fromHtmlExp (HtmlEvent  _ _ hs)  = fromHtmlExp hs
 fromHtmlExp (HtmlCRef   _ hs)    = fromHtmlExp hs
+
+--- The type of HTML expressions is an instance of class `HTML`.
+instance HTML HtmlExp where
+  htmlText   = HtmlText
+  htmlStruct = HtmlStruct
+  updAttrs   = updHtmlAttrs
+  toBaseHtml = fromHtmlExp
 
 ------------------------------------------------------------------------------
 --- Extracts the textual contents of a list of HTML expressions.
