@@ -4,6 +4,7 @@
 --- @author Michael Hanus
 --- @version October 2020
 ------------------------------------------------------------------------------
+{-# OPTIONS_CYMAKE -Wno-incomplete-patterns #-}
 
 module HTML.Parser ( readHtmlFile, parseHtmlString )
  where
@@ -31,14 +32,14 @@ data HtmlToken = HText String | HElem String [(String,String)]
 -- parse a list of HTML tokens into list of HTML expressions:
 -- (first argument "helems" is a stack of already read tokens)
 parseHtmlTokens :: [BaseHtml] -> [HtmlToken] -> [BaseHtml]
-parseHtmlTokens helems [] = helems
+parseHtmlTokens helems []             = helems
 parseHtmlTokens helems (HText s : hs) =
  parseHtmlTokens (BaseText s : helems) hs
 parseHtmlTokens helems (HElem (t:ts) args : hs) =
  if t == '/'
- then let (structargs,elems,rest) = splitHtmlElems ts helems
-      in parseHtmlTokens ([BaseStruct ts structargs elems] ++ rest) hs
- else parseHtmlTokens (BaseStruct (t:ts) args [] : helems) hs
+   then let (structargs,elems,rest) = splitHtmlElems ts helems
+        in parseHtmlTokens ([BaseStruct ts structargs elems] ++ rest) hs
+   else parseHtmlTokens (BaseStruct (t:ts) args [] : helems) hs
 
 
 -- split the HTML token stack up to a particular token:
