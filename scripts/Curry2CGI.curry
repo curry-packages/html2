@@ -5,7 +5,7 @@
 --- for executing cgi scripts.
 ---
 --- @author Michael Hanus
---- @version September 2020
+--- @version October 2020
 ------------------------------------------------------------------------------
 
 module Curry2CGI ( main )
@@ -13,21 +13,16 @@ module Curry2CGI ( main )
 
 import Char         ( isSpace )
 import Directory    ( createDirectoryIfMissing, doesFileExist )
-import Distribution ( installDir )
-import FileGoodies
+import FileGoodies  ( dirName )
 import FilePath     ( (</>), isRelative )
-import GetOpt
 import IOExts       ( evalCmd )
 import List         ( intercalate, isPrefixOf, nub )
 import Maybe        ( catMaybes )
-import ReadNumeric  ( readNat )
 import System
 import Time         ( calendarTimeToString, getLocalTime )
 
-import AbstractCurry.Types       ( QName )
 import FlatCurry.Files           ( readFlatCurry )
 import FlatCurry.Annotated.Files ( readTypedFlatCurry )
-import System.CurryPath          ( stripCurrySuffix )
 
 import C2C.Options
 import C2C.ExtractForms             ( extractFormsInProg )
@@ -80,10 +75,11 @@ compileCGI opts transmods mname = do
   writeFile (mainmod ++ ".curry") mainprog
   unless (null transmods) $ precompile mainmod
   -- compile main module:
+  let curryverb = if optVerb opts == 2 then 1 else optVerb opts
   cf <- system $ unwords $
     [ optCPM opts, optSystem opts </> "bin" </> "curry" , "--nocypm" ] ++
     map (\rcopts -> "-D" ++ rcopts) (optCurryRC opts) ++
-    [ ":set", 'v' : show (optVerb opts) ] ++
+    [ ":set", 'v' : show curryverb ] ++
     optCurryOpts opts ++
     [ ":load", mainmod, ":save", maincall, ":quit" ]
   when (cf > 0) $ do

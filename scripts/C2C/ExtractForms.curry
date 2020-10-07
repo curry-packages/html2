@@ -4,7 +4,7 @@
 --- necessary.
 ---
 --- @author Michael Hanus
---- @version September 2020
+--- @version October 2020
 ------------------------------------------------------------------------------
 
 module C2C.ExtractForms ( extractFormsInProg )
@@ -14,7 +14,7 @@ import Directory    ( doesFileExist, getModificationTime, removeFile )
 import FilePath     ( (</>), (<.>) )
 import IO           ( hGetContents, openFile, IOMode(..) )
 import List         ( intercalate, partition )
-import System       ( exitWith, getArgs, getPID, system )
+import System       ( exitWith, getPID, system )
 
 import AbstractCurry.Files
 import AbstractCurry.Select
@@ -102,17 +102,20 @@ extractFormOps prog =
 -- current module.
 checkFormElemCallsInProg :: Options -> [QName] -> CurryProg -> IO ()
 checkFormElemCallsInProg opts formnames prog = do
-  let mname  = progName prog
-      fdecls = functions prog
+  let mname    = progName prog
+      fdecls   = functions prog
       errfuncs = concatMap (checkFormElemCallsInFunc opts formnames mname)
                            fdecls
   unless (null errfuncs) $ do
-    putStrLn $ "ERROR: Illegal use of 'HTML.Base.formElem' in function: " ++
-               unwords (map snd errfuncs)
+    putStrLn $ "ERROR: Illegal use of 'HTML.Base.formElem' in:\n" ++
+               unlines (map formatErr errfuncs)
     exitWith 1
+ where
+  formatErr (qn,reason) = "'" ++ showQName qn ++ "': " ++ reason
 
-checkFormElemCallsInFunc :: Options -> [QName] -> String -> CFuncDecl -> [QName]
-checkFormElemCallsInFunc opts formnames mname fdecl =
+checkFormElemCallsInFunc :: Options -> [QName] -> String -> CFuncDecl
+                         -> [(QName,String)]
+checkFormElemCallsInFunc _ formnames mname fdecl =
   concatMap checkRule (funcRules fdecl)
  where
   checkRule (CRule _ rhs) = checkRhs rhs
@@ -140,10 +143,13 @@ checkFormElemCallsInFunc opts formnames mname fdecl =
     (CSymbol f1, CSymbol f2)  -> if f1 /= hfe || fst f2 /= mname ||
                                     f2 `elem` formnames
                                    then []
-                                   else [funcName fdecl]
-    (CSymbol f, _) | f == hfe -> [funcName fdecl]
+                                   else [(funcName fdecl, opnotfounderr)]
+    (CSymbol f, _) | f == hfe -> [(funcName fdecl, notoplevelerr)]
     _                         -> checkExp e1 ++ checkExp e2
-   where hfe = ("HTML.Base","formElem")
+   where
+    hfe           = ("HTML.Base","formElem")
+    opnotfounderr = "not applied to exported form operation"
+    notoplevelerr = "not applied to top-level operation"
 
   checkStat (CSExpr e)  = checkExp e
   checkStat (CSPat _ e) = checkExp e

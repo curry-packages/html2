@@ -4,6 +4,8 @@
 -- to reverse and duplicate the input string.
 ------------------------------------------------------------------------------
 
+module RevDup ( main, revDupForm ) where
+
 import HTML.Base
 
 -- Example: a form with a text input field and two submit buttons.
