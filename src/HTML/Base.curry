@@ -30,7 +30,7 @@ module HTML.Base
    HtmlFormDef, simpleFormDef, simpleFormDefWithID, formDef, formDefWithID,
    formDefId, setFormDefId, formDefRead, formDefView,
    CookieParam(..),
-   CgiRef, idOfCgiRef, instCgiRefs, CgiEnv, HtmlHandler,
+   HtmlRef, idOfHtmlRef, instHtmlRefs, HtmlEnv, HtmlHandler,
    defaultEncoding,
    answerText, answerEncText,
    getCookies,
@@ -126,19 +126,19 @@ instance HTML BaseHtml where
 
 --- The (abstract) data type for representing references to input elements
 --- in HTML forms.
-data CgiRef = CgiRef String
+data HtmlRef = HtmlRef String
 
---- Internal identifier of a CgiRef (intended only for internal use in other
+--- Internal identifier of a HtmlRef (intended only for internal use in other
 --- libraries!).
-idOfCgiRef :: CgiRef -> String
-idOfCgiRef (CgiRef i) = i
+idOfHtmlRef :: HtmlRef -> String
+idOfHtmlRef (HtmlRef i) = i
 
 --- The type for representing cgi environments, i.e., mappings
 --- from cgi references to the corresponding values of the input elements.
-type CgiEnv = CgiRef -> String
+type HtmlEnv = HtmlRef -> String
 
 --- The type of event handlers occurring in HTML forms.
-type HtmlHandler = CgiEnv -> IO HtmlPage
+type HtmlHandler = HtmlEnv -> IO HtmlPage
 
 ------------------------------------------------------------------------------
 --- The data type for representing HTML expressions with input elements,
@@ -146,7 +146,7 @@ type HtmlHandler = CgiEnv -> IO HtmlPage
 --- @cons HtmlText s           - a text string without any further structure
 --- @cons HtmlStruct t as hs   - a structure with a tag, attributes, and
 ---                              HTML expressions inside the structure
---- @cons HtmlCRef ref h       - an input element (described by the second
+--- @cons HtmlInput ref h      - an input element (described by the second
 ---                              argument) with a cgi reference
 --- @cons HtmlEvent h ref hdlr - an input element (first arg) identified
 ---                              by a cgi reference with an associated
@@ -158,8 +158,8 @@ data HtmlExp =
     HtmlText   String
   | HtmlStruct String Attrs [HtmlExp]
   | HtmlAction (IO HtmlExp)
-  | HtmlCRef   CgiRef HtmlExp
-  | HtmlEvent  CgiRef HtmlHandler HtmlExp
+  | HtmlInput  HtmlRef HtmlExp
+  | HtmlEvent  HtmlRef HtmlHandler HtmlExp
 
 --- Updates the attributes in an HTML expression.
 updHtmlAttrs :: (Attrs -> Attrs) -> HtmlExp -> HtmlExp
@@ -167,7 +167,7 @@ updHtmlAttrs _ (HtmlText s)                 = HtmlText s
 updHtmlAttrs f (HtmlStruct tag attrs hexps) = HtmlStruct tag (f attrs) hexps
 updHtmlAttrs f (HtmlEvent ref handler he)   =
   HtmlEvent ref handler (updHtmlAttrs f he)
-updHtmlAttrs f (HtmlCRef ref he)            = HtmlCRef ref (updHtmlAttrs f he)
+updHtmlAttrs f (HtmlInput ref he)           = HtmlInput ref (updHtmlAttrs f he)
 updHtmlAttrs _ (HtmlAction act)             = HtmlAction act
 
 --- Transforms a static into a dynamic HTML document.
@@ -183,7 +183,7 @@ fromHtmlExp (HtmlText   s)       = BaseText s
 fromHtmlExp (HtmlStruct t ps hs) = BaseStruct t ps (map fromHtmlExp hs)
 fromHtmlExp (HtmlAction a)       = BaseAction a
 fromHtmlExp (HtmlEvent  _ _ hs)  = fromHtmlExp hs
-fromHtmlExp (HtmlCRef   _ hs)    = fromHtmlExp hs
+fromHtmlExp (HtmlInput  _ hs)    = fromHtmlExp hs
 
 --- The type of HTML expressions is an instance of class `HTML`.
 instance HTML HtmlExp where
@@ -304,31 +304,31 @@ genInitForm :: HtmlFormDef a -> IO [HtmlExp]
 genInitForm (HtmlFormDef _ readact formgen) =
   fromFormReader readact >>= return . formgen
 
---- Instantiates all CgiRefs with a unique tag in HTML expressions.
+--- Instantiates all HtmlRefs with a unique tag in HTML expressions.
 --- Only internally used.
 --- Parameters: HTML expressions, number for cgi-refs
 --- Result: translated HTML expressions, new number for cgi-refs
-instCgiRefs :: [HtmlExp] -> Int -> ([HtmlExp],Int)
-instCgiRefs [] i = ([],i)
-instCgiRefs (HtmlText s : hexps) i =
-  case instCgiRefs hexps i of
+instHtmlRefs :: [HtmlExp] -> Int -> ([HtmlExp],Int)
+instHtmlRefs [] i = ([],i)
+instHtmlRefs (HtmlText s : hexps) i =
+  case instHtmlRefs hexps i of
     (nhexps,j) -> (HtmlText s : nhexps, j)
-instCgiRefs (HtmlStruct tag attrs hexps1 : hexps2) i =
-  case instCgiRefs hexps1 i of
-    (nhexps1,j) -> case instCgiRefs hexps2 j of
+instHtmlRefs (HtmlStruct tag attrs hexps1 : hexps2) i =
+  case instHtmlRefs hexps1 i of
+    (nhexps1,j) -> case instHtmlRefs hexps2 j of
                      (nhexps2,k) -> (HtmlStruct tag attrs nhexps1 : nhexps2, k)
-instCgiRefs (HtmlEvent cgiref handler (HtmlStruct tag attrs hes) : hexps) i
-  | idOfCgiRef cgiref =:= ("FIELD_" ++ show i)
-  = case instCgiRefs hexps (i+1) of
+instHtmlRefs (HtmlEvent cgiref handler (HtmlStruct tag attrs hes) : hexps) i
+  | idOfHtmlRef cgiref =:= ("FIELD_" ++ show i)
+  = case instHtmlRefs hexps (i+1) of
       (nhexps,j) ->
          (HtmlEvent cgiref handler (HtmlStruct tag attrs hes) : nhexps, j)
-instCgiRefs (HtmlCRef cgiref hexp : hexps) i
-  | idOfCgiRef cgiref =:= ("FIELD_" ++ show i)
-  = case instCgiRefs [hexp] (i+1) of
-      ([nhexp],j) -> case instCgiRefs hexps j of
+instHtmlRefs (HtmlInput cgiref hexp : hexps) i
+  | idOfHtmlRef cgiref =:= ("FIELD_" ++ show i)
+  = case instHtmlRefs [hexp] (i+1) of
+      ([nhexp],j) -> case instHtmlRefs hexps j of
                        (nhexps,k) -> (nhexp : nhexps, k)
-instCgiRefs (HtmlAction _ : _) _ =
-  error "HTML.Base.instCgiRefs: HtmlAction occurred"
+instHtmlRefs (HtmlAction _ : _) _ =
+  error "HTML.Base.instHtmlRefs: HtmlAction occurred"
 
 ------------------------------------------------------------------------------
 --- The data type for representing HTML pages. Since the HTML document
@@ -814,12 +814,12 @@ formElem formspec = BaseAction formAction
     he       <- genInitForm formspec
     return $
        HtmlStruct "form" [("method", "post"), ("action", '?' : urlparam)]
-         (hiddenField "FORMID" (formDefId formspec) : fst (instCgiRefs he 0))
+         (hiddenField "FORMID" (formDefId formspec) : fst (instHtmlRefs he 0))
 
 --- A button to submit a form with a label string and an event handler.
 button :: String -> HtmlHandler -> HtmlExp
 button label handler
-  | cref =:= CgiRef ref -- instantiate cref argument
+  | cref =:= HtmlRef ref -- instantiate cref argument
   = HtmlEvent cref handler
               (HtmlStruct "input" [("type","submit"), ("name",ref),
                                    ("value",htmlQuote label)] [])
@@ -836,35 +836,35 @@ resetButton label =
 --- @param handler - event handler
 imageButton :: String -> HtmlHandler -> HtmlExp
 imageButton src handler
-  | cref =:= CgiRef ref -- instantiate cref argument
+  | cref =:= HtmlRef ref -- instantiate cref argument
   = HtmlEvent cref handler
        (HtmlStruct "input" [("type","image"),("name",ref),("src",src)] [])
  where
   cref,ref free
 
 --- Input text field with a reference and an initial contents
-textField :: CgiRef -> String -> HtmlExp
+textField :: HtmlRef -> String -> HtmlExp
 textField cref contents
-  | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef cref
+  | cref =:= HtmlRef ref -- instantiate cref argument
+  = HtmlInput cref
       (HtmlStruct "input" [("type","text"),("name",ref),
                            ("value",htmlQuote contents)] [])
  where ref free
 
 --- Input text field (where the entered text is obscured) with a reference
-password :: CgiRef -> HtmlExp
+password :: HtmlRef -> HtmlExp
 password cref
-  | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef cref
+  | cref =:= HtmlRef ref -- instantiate cref argument
+  = HtmlInput cref
        (HtmlStruct "input" [("type","password"),("name",ref)] [])
  where
    ref free
 
 --- Input text area with a reference, height/width, and initial contents
-textArea :: CgiRef -> (Int,Int) -> String -> HtmlExp
+textArea :: HtmlRef -> (Int,Int) -> String -> HtmlExp
 textArea cref (height,width) contents
-  | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef cref
+  | cref =:= HtmlRef ref -- instantiate cref argument
+  = HtmlInput cref
        (HtmlStruct "textarea" [("name",ref),
                                 ("rows",show height),("cols",show width)]
                                [htxt contents])
@@ -873,10 +873,10 @@ textArea cref (height,width) contents
 
 --- A checkbox with a reference and a value.
 --- The value is returned if checkbox is on, otherwise "" is returned.
-checkBox :: CgiRef -> String -> HtmlExp
+checkBox :: HtmlRef -> String -> HtmlExp
 checkBox cref value
-  | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef cref
+  | cref =:= HtmlRef ref -- instantiate cref argument
+  = HtmlInput cref
        (HtmlStruct "input" [("type","checkbox"),("name",ref),
                             ("value",htmlQuote value)] [])
  where
@@ -884,10 +884,10 @@ checkBox cref value
 
 --- A checkbox that is initially checked with a reference and a value.
 --- The value is returned if checkbox is on, otherwise "" is returned.
-checkedBox :: CgiRef -> String -> HtmlExp
+checkedBox :: HtmlRef -> String -> HtmlExp
 checkedBox cref value
-  | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef cref
+  | cref =:= HtmlRef ref -- instantiate cref argument
+  = HtmlInput cref
        (HtmlStruct "input" [("type","checkbox"),("name",ref),
                             ("value",htmlQuote value),("checked","checked")] [])
  where
@@ -902,10 +902,10 @@ checkedBox cref value
 --- The user can select another button but always at most one button
 --- of the radio can be selected. The value corresponding to the
 --- selected button is returned in the environment for this radio reference.
-radioMain :: CgiRef -> String -> HtmlExp
+radioMain :: HtmlRef -> String -> HtmlExp
 radioMain cref value
-  | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef cref
+  | cref =:= HtmlRef ref -- instantiate cref argument
+  = HtmlInput cref
        (HtmlStruct "input" [("type","radio"),("name",ref),
                             ("value",htmlQuote value),("checked","yes")] [])
  where
@@ -913,10 +913,10 @@ radioMain cref value
 
 --- A main button of a radio (initially "off") with a reference and a value.
 --- The value is returned of this button is on.
-radioMainOff :: CgiRef -> String -> HtmlExp
+radioMainOff :: HtmlRef -> String -> HtmlExp
 radioMainOff cref value
-  | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef cref
+  | cref =:= HtmlRef ref -- instantiate cref argument
+  = HtmlInput cref
        (HtmlStruct "input" [("type","radio"),("name",ref),
                             ("value",htmlQuote value)] [])
  where
@@ -925,9 +925,9 @@ radioMainOff cref value
 --- A further button of a radio (initially "off") with a reference (identical
 --- to the main button of this radio) and a value.
 --- The value is returned of this button is on.
-radioOther :: CgiRef -> String -> HtmlExp
+radioOther :: HtmlRef -> String -> HtmlExp
 radioOther cref value
-  | cref =:= CgiRef ref -- instantiate cref argument
+  | cref =:= HtmlRef ref -- instantiate cref argument
   = HtmlStruct "input"
                [("type","radio"),("name",ref),("value",htmlQuote value)] []
  where
@@ -936,10 +936,10 @@ radioOther cref value
 --- A selection button with a reference and a list of name/value pairs.
 --- The names are shown in the selection and the value is returned
 --- for the selected name.
-selection :: CgiRef -> [(String,String)] -> HtmlExp
+selection :: HtmlRef -> [(String,String)] -> HtmlExp
 selection cref menue
-  | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef cref
+  | cref =:= HtmlRef ref -- instantiate cref argument
+  = HtmlInput cref
        (HtmlStruct "select" [("name",ref)]
          ((concat . map (\(n,v)->[HtmlStruct "option" [("value",v)] [htxt n]]))
           menue))
@@ -954,10 +954,10 @@ selection cref menue
 --- @param nvs - list of name/value pairs
 --- @param sel - the index of the initially selected item in the list nvs
 --- @return an HTML expression representing the selection button
-selectionInitial :: CgiRef -> [(String,String)] -> Int -> HtmlExp
+selectionInitial :: HtmlRef -> [(String,String)] -> Int -> HtmlExp
 selectionInitial cref sellist sel
-  | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef cref (HtmlStruct "select" [("name",ref)] (selOption sellist sel))
+  | cref =:= HtmlRef ref -- instantiate cref argument
+  = HtmlInput cref (HtmlStruct "select" [("name",ref)] (selOption sellist sel))
  where
    ref free
 
@@ -973,10 +973,10 @@ selectionInitial cref sellist sel
 --- corresonding name is initially selected. If more than one name
 --- has been selected, all values are returned in one string
 --- where the values are separated by newline (`'\n'`) characters.
-multipleSelection :: CgiRef -> [(String,String,Bool)] -> HtmlExp
+multipleSelection :: HtmlRef -> [(String,String,Bool)] -> HtmlExp
 multipleSelection cref sellist
-  | cref =:= CgiRef ref -- instantiate cref argument
-  = HtmlCRef cref
+  | cref =:= HtmlRef ref -- instantiate cref argument
+  = HtmlInput cref
              (HtmlStruct "select" [("name",ref),("multiple","multiple")]
                                    (map selOption sellist))
  where
@@ -1219,9 +1219,9 @@ parseCookies str =
 
 --- For image buttons: retrieve the coordinates where the user clicked
 --- within the image.
-coordinates :: CgiEnv -> Maybe (Int,Int)
-coordinates env = let x = env (CgiRef "x")
-                      y = env (CgiRef "y")
+coordinates :: HtmlEnv -> Maybe (Int,Int)
+coordinates env = let x = env (HtmlRef "x")
+                      y = env (HtmlRef "y")
                   in if x/="" && y/=""
                        then Just (tryReadNat 0 x, tryReadNat 0 y)
                        else Nothing

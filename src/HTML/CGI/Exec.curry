@@ -48,7 +48,7 @@ execFormDef :: HtmlFormDef a -> [(String,String)] -> IO ()
 execFormDef formdef cgivars = catchFormErrors $ do
   val <- formDefRead formdef
   hexps <- mapM execHtml (formDefView formdef val)
-  let (iform,_) = instCgiRefs hexps 0
+  let (iform,_) = instHtmlRefs hexps 0
       cenv      = cgiGetValue cgivars
   p <- maybe (return noHandlerPage) (\h -> h cenv) (findHandler cenv iform)
   execPage p >>= printPage
@@ -122,20 +122,20 @@ formNotCompiledPage formid =
                  "Please re-compile the web application with all forms!"]]
 
 -- Transforms a CGI variable mapping into a CGI environment.
-cgiGetValue :: [(String,String)] -> CgiEnv
-cgiGetValue cgivars cgiref =
-  intercalate "\n" (map snd (filter (((idOfCgiRef cgiref) ==) . fst) cgivars))
+cgiGetValue :: [(String,String)] -> HtmlEnv
+cgiGetValue cgivars href =
+  intercalate "\n" (map snd (filter (((idOfHtmlRef href) ==) . fst) cgivars))
 
 -- Find the handler corresponding to the variables in the CGI environment.
-findHandler :: CgiEnv -> [HtmlExp] -> Maybe HtmlHandler
+findHandler :: HtmlEnv -> [HtmlExp] -> Maybe HtmlHandler
 findHandler _    []                   = Nothing
 findHandler cenv (HtmlText _ : hexps) = findHandler cenv hexps
 findHandler cenv (HtmlStruct _ _ hexps1 : hexps2) =
   findHandler cenv (hexps1 ++ hexps2)
-findHandler cenv (HtmlEvent cgiref handler _ : hexps) =
-  if null (cenv cgiref) then findHandler cenv hexps
-                        else Just handler
-findHandler cenv (HtmlCRef _ hexp : hexps) = findHandler cenv (hexp : hexps)
+findHandler cenv (HtmlEvent href handler _ : hexps) =
+  if null (cenv href) then findHandler cenv hexps
+                      else Just handler
+findHandler cenv (HtmlInput _ hexp : hexps) = findHandler cenv (hexp : hexps)
 findHandler _ (HtmlAction _    : _) =
   error "HTML.CGI.Exec: HtmlAction occurred"
 
@@ -154,8 +154,8 @@ execHtml :: HtmlExp -> IO HtmlExp
 execHtml htmlexp = case htmlexp of
   HtmlText   _           -> return htmlexp
   HtmlStruct tag ats hes -> mapM execHtml hes >>= return . HtmlStruct tag ats
-  HtmlCRef   cref he     -> do hexp <- execHtml he
-                               return (HtmlCRef cref hexp)
+  HtmlInput  cref he     -> do hexp <- execHtml he
+                               return (HtmlInput cref hexp)
   HtmlEvent  cref hdl he -> do hexp <- execHtml he
                                return (HtmlEvent cref hdl hexp)
   HtmlAction act         -> act >>= execHtml
