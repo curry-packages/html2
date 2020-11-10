@@ -3,7 +3,7 @@
 -- a dynamic HTML page  to show the current time
 ------------------------------------------------------------------------------
 
-import Time
+import Data.Time -- from package `time`
 import HTML.Base
 
 -- Example: an HTML page to show the current time.

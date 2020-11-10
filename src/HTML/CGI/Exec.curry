@@ -11,11 +11,11 @@
 module HTML.CGI.Exec ( printMainPage, execFormDef )
  where
 
-import IO          ( hPutStrLn, stderr )
-import List        ( intercalate, split )
-import ReadNumeric ( readHex, readNat )
-import System      ( getEnviron )
-import Time        ( calendarTimeToString, getLocalTime )
+import Data.Time          ( calendarTimeToString, getLocalTime )
+import Data.List          ( intercalate, split )
+import Numeric            ( readHex, readNat )
+import System.Environment ( getEnv )
+import System.IO          ( hPutStrLn, stderr )
 
 import HTML.Base
 
@@ -62,7 +62,7 @@ catchFormErrors :: IO () -> IO ()
 catchFormErrors formact = catch formact showFormError
  where
   showFormError err = do
-    let errstr = showError err
+    let errstr = show err
     cdate <- getLocalTime >>= return . calendarTimeToString
     hPutStrLn stderr $ cdate ++ ": " ++ errstr
     printPage $ HtmlPage "Run-time exception" [PageEnc defaultEncoding]
@@ -166,8 +166,9 @@ execHtml htmlexp = case htmlexp of
 --- Used for the implementation of HTML event handlers.
 getFormVariables :: IO [(String,String)]
 getFormVariables = do
-  clen <- getEnviron "CONTENT_LENGTH"
-  cont <- getNChar (maybe 0 fst (readNat clen))
+  clen <- getEnv "CONTENT_LENGTH"
+  cont <- getNChar (case readNat clen of [(n,_)] -> n
+                                         _       -> 0)
   return (includeCoordinates (parseCgiEnv cont))
 
 -- translate a string of cgi environment bindings into list of binding pairs:

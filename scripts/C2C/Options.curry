@@ -2,17 +2,18 @@
 --- Option process for the `curry2cgi` script.
 ---
 --- @author Michael Hanus
---- @version October 2020
+--- @version November 2020
 ------------------------------------------------------------------------------
 
 module C2C.Options
  where
 
-import Distribution ( installDir )
-import GetOpt
-import List         ( nub )
-import ReadNumeric  ( readNat )
-import System       ( exitWith, system )
+import Control.Monad       ( when, unless )
+import Data.List           ( nub )
+import Language.Curry.Distribution ( installDir )
+import Numeric             ( readNat )
+import System.Process      ( exitWith, system )
+import System.Console.GetOpt
 
 import AbstractCurry.Types ( QName )
 import System.CurryPath    ( stripCurrySuffix )
@@ -125,11 +126,9 @@ options =
              "(default: '-t 120')")
   ]
  where
-  safeReadNat opttrans s opts =
-   let numError = error "Illegal number argument (try `-h' for help)"
-   in maybe numError
-            (\ (n,rs) -> if null rs then opttrans n opts else numError)
-            (readNat s)
+  safeReadNat opttrans s opts = case readNat s of
+   [(n,"")] -> opttrans n opts
+   _        -> error "Illegal number argument (try `-h' for help)"
 
   checkVerb n opts = if n>=0 && n<4
                      then opts { optVerb = n }

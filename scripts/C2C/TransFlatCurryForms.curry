@@ -2,14 +2,15 @@
 --- Transforms a FlatCurry file by setting correct IDs in all form definitions.
 ---
 --- @author Michael Hanus
---- @version August 2020
+--- @version November 2020
 ------------------------------------------------------------------------------
 
 module C2C.TransFlatCurryForms ( setFormIDsInFlatCurry, copyTransFlatCurry )
  where
 
-import FilePath     ( (</>) )
-import System       ( exitWith, system )
+import Control.Monad     ( when, unless )
+import System.FilePath   ( (</>) )
+import System.Process    ( exitWith, system )
 
 import FlatCurry.Files
 import FlatCurry.Types hiding ( showQName )

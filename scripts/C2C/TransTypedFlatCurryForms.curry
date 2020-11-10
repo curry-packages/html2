@@ -10,8 +10,9 @@ module C2C.TransTypedFlatCurryForms
   ( setFormIDsInTypedFlatCurry, copyTransTypedFlatCurry )
  where
 
-import FilePath     ( (</>), (<.>) )
-import System       ( exitWith, system )
+import Control.Monad     ( when, unless )
+import System.FilePath   ( (</>), (<.>) )
+import System.Process    ( exitWith, system )
 
 import FlatCurry.Annotated.Files
 import FlatCurry.Annotated.Types

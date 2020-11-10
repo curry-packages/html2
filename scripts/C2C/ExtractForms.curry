@@ -4,17 +4,18 @@
 --- necessary.
 ---
 --- @author Michael Hanus
---- @version October 2020
+--- @version November 2020
 ------------------------------------------------------------------------------
 
 module C2C.ExtractForms ( extractFormsInProg )
  where
 
-import Directory    ( doesFileExist, getModificationTime, removeFile )
-import FilePath     ( (</>), (<.>) )
-import IO           ( hGetContents, openFile, IOMode(..) )
-import List         ( intercalate, partition )
-import System       ( exitWith, getPID, system )
+import Control.Monad    ( when, unless )
+import Data.List        ( intercalate, partition )
+import System.Directory ( doesFileExist, getModificationTime, removeFile )
+import System.FilePath  ( (</>), (<.>) )
+import System.IO        ( hGetContents, openFile, IOMode(..) )
+import System.Process   ( exitWith, getPID, system )
 
 import AbstractCurry.Files
 import AbstractCurry.Select
@@ -80,7 +81,7 @@ readFormsInProg opts mname formfile = do
                else checkFormIDsInProg opts mname formnames
   putStrLnInter opts $ "Writing form names to '" ++ formfile ++ "'"
   -- store form names in form cache file:
-  catch (writeFile formfile (show (mbtrans, formnames))) (const done)
+  catch (writeFile formfile (show (mbtrans, formnames))) (const (return ()))
   return (mbtrans, formnames)
 
 --- Extract public and private form definitions from a program.
@@ -193,7 +194,7 @@ testFormIDsInProg opts mname formnames = do
   let testprog = unlines
         [ "import " ++ mname
         , "import HTML.Base"
-        , "import System ( exitWith )"
+        , "import System.Process ( exitWith )"
         , ""
         , checkFormIDDefinition
         , ""
@@ -201,7 +202,7 @@ testFormIDsInProg opts mname formnames = do
         , "main = do"
         , "  results <- sequence [" ++
                     intercalate "," (map genFormCall formnames) ++ "]"
-        , "  unless (and results) (exitWith 1)"
+        , "  if (and results) then return () else exitWith 1"
         ]
   writeFile (testprogname ++ ".curry") testprog
   putStrLnDetail opts testprog

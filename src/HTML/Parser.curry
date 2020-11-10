@@ -9,7 +9,7 @@
 module HTML.Parser ( readHtmlFile, parseHtmlString )
  where
 
-import Char
+import Data.Char
 import HTML.Base
 
 --- Reads a file with HTML text and returns the corresponding HTML expressions.

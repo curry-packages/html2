@@ -3,7 +3,7 @@
 -- a form with button to show the current time
 ------------------------------------------------------------------------------
 
-import Time
+import Data.Time -- from package `time`
 import HTML.Base
 
 -- Example: a form with button to show the current time.

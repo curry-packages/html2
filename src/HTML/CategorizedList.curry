@@ -7,8 +7,8 @@ module HTML.CategorizedList
   ( list2CategorizedHtml, categorizeByItemKey, stringList2ItemList )
  where
 
-import Char
-import List
+import Data.Char
+import Data.List
 
 import HTML.Base
 

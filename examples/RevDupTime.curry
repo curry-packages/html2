@@ -5,8 +5,6 @@
 -- from another module.
 ------------------------------------------------------------------------------
 
-import Time
-
 import HTML.Base
 import TimeForm ( timeForm )
 

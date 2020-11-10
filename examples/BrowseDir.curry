@@ -6,10 +6,10 @@
 -- Subdirectories are presented as links to browse them.
 --
 -- @author Michael Hanus
--- @version September 2020
+-- @version November 2020
 ------------------------------------------------------------------------------
 
-import Directory
+import System.Directory -- from package `directory`
 
 import HTML.Base
 
@@ -18,7 +18,7 @@ main = do
   param <- getUrlParameter
   let dir = if null param then "." else urlencoded2string param
   entries <- getDirectoryContents dir
-  hexps <- mapIO (entry2html dir) entries
+  hexps <- mapM (entry2html dir) entries
   return $ page "Browse Directory"
                 [h1 [htxt $ "Directory: " ++ dir], ulist hexps]
 

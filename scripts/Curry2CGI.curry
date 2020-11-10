@@ -5,21 +5,22 @@
 --- for executing cgi scripts.
 ---
 --- @author Michael Hanus
---- @version October 2020
+--- @version November 2020
 ------------------------------------------------------------------------------
 
 module Curry2CGI ( main )
  where
 
-import Char         ( isSpace )
-import Directory    ( createDirectoryIfMissing, doesFileExist )
-import FileGoodies  ( dirName )
-import FilePath     ( (</>), isRelative )
-import IOExts       ( evalCmd )
-import List         ( intercalate, isPrefixOf, nub )
-import Maybe        ( catMaybes )
-import System
-import Time         ( calendarTimeToString, getLocalTime )
+import Control.Monad      ( when, unless )
+import Data.Char          ( isSpace )
+import Data.List          ( intercalate, isPrefixOf, nub )
+import Data.Maybe         ( catMaybes )
+import Data.Time          ( calendarTimeToString, getLocalTime )
+import System.Directory   ( createDirectoryIfMissing, doesFileExist )
+import System.Environment ( getArgs, getEnv )
+import System.FilePath    ( (</>), isRelative, takeDirectory )
+import System.IOExts      ( evalCmd )
+import System.Process     ( getPID, exitWith, system )
 
 import FlatCurry.Files           ( readFlatCurry )
 import FlatCurry.Annotated.Files ( readTypedFlatCurry )
@@ -67,7 +68,7 @@ compileCGI opts transmods mname = do
       maincall = "main_cgi_9999_" ++ show pid
       cgifile  = if null (optOutput opts) then mname ++ ".cgi"
                                           else optOutput opts
-      cgidir   = dirName cgifile
+      cgidir   = takeDirectory cgifile
   createDirectoryIfMissing True cgidir
   let mainprog = genMainProg opts mname mainmod maincall
   when (optVerb opts > 1) $ putStr $ unlines
@@ -115,7 +116,7 @@ compileCGI opts transmods mname = do
 genShellScript :: Options -> String -> IO ()
 genShellScript opts cgifile = do
   system $ "/bin/rm -f " ++ cgifile
-  langenv <- getEnviron "LANG"
+  langenv <- getEnv "LANG"
   let limit = optLimit opts
       cgibin = (if isRelative cgifile then "./" else "") ++ cgifile ++ ".bin"
       script = unlines $
@@ -126,7 +127,7 @@ genShellScript opts cgifile = do
                  ["exec " ++ cgibin ++ " 2>> " ++ cgifile ++ ".log"]
   writeFile cgifile script
   system $ unwords ["chmod", "755", cgifile]
-  done
+  return ()
 
 --- Generates the main program which is compiled as the CGI executable.
 --- The program defines a main operation of the following form:

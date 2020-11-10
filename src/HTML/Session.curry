@@ -18,16 +18,17 @@ module HTML.Session
   , writeSessionData, removeSessionData, modifySessionData
   ) where
 
-import Directory    ( createDirectory, doesDirectoryExist )
-import FilePath     ( (</>) )
-import Global
-import List         ( findIndex, init, intercalate, replace, split )
-import Maybe        ( fromMaybe )
-import System       ( getEnviron )
-import Time         ( ClockTime, addMinutes, clockTimeToInt, getClockTime )
+import Control.Monad      ( unless )
+import System.Directory   ( createDirectory, doesDirectoryExist )
+import System.FilePath    ( (</>) )
+import Data.List          ( findIndex, init, intercalate, replace, split )
+import Data.Maybe         ( fromMaybe )
+import System.Environment ( getEnv )
+import Data.Time          (ClockTime, addMinutes, clockTimeToInt, getClockTime )
 
+import Crypto.Hash        ( randomString )
+import Global
 import HTML.Base
-import Crypto.Hash  ( randomString )
 
 ------------------------------------------------------------------------------
 --- The name of the local directory where the session data,
@@ -118,7 +119,7 @@ sessionCookie = do
 --- If `SCRIPT_NAME` is not set, the returned string is empty.
 getScriptDirPath :: IO String
 getScriptDirPath = do
-  scriptname <- getEnviron "SCRIPT_NAME"
+  scriptname <- getEnv "SCRIPT_NAME"
   let scriptpath = if null scriptname then []
                                       else split (=='/') (tail scriptname)
   if null scriptpath
@@ -181,7 +182,7 @@ getSessionMaybeData sessionData = toFormReader $ do
 --- for the current session.
 getSessionData :: Global (SessionStore a) -> a -> FormReader a
 getSessionData sessiondata defaultdata =
-  liftM (fromMaybe defaultdata) (getSessionMaybeData sessiondata)
+  fmap (fromMaybe defaultdata) (getSessionMaybeData sessiondata)
 
 --- Stores data related to the current user session in a session store.
 writeSessionData :: Global (SessionStore a) -> a -> IO ()

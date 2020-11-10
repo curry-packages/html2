@@ -3,7 +3,7 @@
 -- of a simple Python script.
 ------------------------------------------------------------------------------
 
-import Directory ( doesFileExist )
+import System.Directory ( doesFileExist ) -- from package `directory`
 import HTML.Base
 
 -- The upload form is defined as a raw search form since the handler
