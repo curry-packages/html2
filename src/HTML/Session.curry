@@ -7,7 +7,7 @@
 --- to hold some session-specific data.
 ---
 --- @author Michael Hanus
---- @version September 2020
+--- @version November 2020
 ------------------------------------------------------------------------------
 
 module HTML.Session
@@ -15,7 +15,7 @@ module HTML.Session
   , sessionCookie, doesSessionExist, withSessionCookie, withSessionCookieInfo
   , SessionStore, emptySessionStore
   , getSessionMaybeData, getSessionData
-  , writeSessionData, removeSessionData, modifySessionData
+  , putSessionData, removeSessionData, modifySessionData
   ) where
 
 import Control.Monad      ( unless )
@@ -185,8 +185,8 @@ getSessionData sessiondata defaultdata =
   fmap (fromMaybe defaultdata) (getSessionMaybeData sessiondata)
 
 --- Stores data related to the current user session in a session store.
-writeSessionData :: Global (SessionStore a) -> a -> IO ()
-writeSessionData sessionData newData = do
+putSessionData :: Global (SessionStore a) -> a -> IO ()
+putSessionData sessionData newData = do
   ensureSessionDataDir
   sid <- getSessionId
   SessionStore sdata <- safeReadGlobal sessionData emptySessionStore
@@ -205,7 +205,7 @@ writeSessionData sessionData newData = do
 modifySessionData :: Global (SessionStore a) -> a -> (a -> a) -> IO ()
 modifySessionData sessiondata defaultdata upd = do
   sd <- fromFormReader $ getSessionData sessiondata defaultdata
-  writeSessionData sessiondata (upd sd)
+  putSessionData sessiondata (upd sd)
 
 --- Removes data related to the current user session from a session store.
 removeSessionData :: Global (SessionStore a) -> IO ()

@@ -31,13 +31,13 @@ revDupForm = formDef readInfo formHtml
     ref free
 
     revHandler env = do
-      writeSessionData rdInput (env ref)
+      putSessionData rdInput (env ref)
       withSessionCookie $ page "Answer"
         [ h1 [ htxt $ "Reversed input: " ++ reverse (env ref)], hrule
         , formElem revDupForm ]
 
     dupHandler env = do
-      writeSessionData rdInput (env ref)
+      putSessionData rdInput (env ref)
       withSessionCookie $ page "Answer"
         [ h1 [ htxt $ "Duplicated input: " ++ env ref ++ env ref], hrule
         , formElem revDupForm ]

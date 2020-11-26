@@ -30,7 +30,7 @@ guessFormHtml t =
         removeSessionData trials
         return $ headerPage ("Correct! " ++ show t ++ " guesses!") []
       else do
-        writeSessionData trials (t+1)
+        putSessionData trials (t+1)
         return $ headerPage ("Too " ++ if nr<42 then "small!" else "large!")
            [formElem guessForm]
 
