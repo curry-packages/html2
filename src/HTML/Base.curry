@@ -1038,24 +1038,6 @@ addClass hexp cls | null cls  = hexp
                   | otherwise = addAttr hexp ("class",cls)
 
 ------------------------------------------------------------------------------
--- Auxiliaries for faster show (could be later put into a standard library)
-
-type ShowS = String -> String
-
-showString :: String -> String -> String
-showString s = (s++)
-
-showChar :: Char -> String -> String
-showChar c = (c:)
-
-nl :: String -> String
-nl = showChar '\n'
-
-concatS :: [a -> a] -> a -> a
-concatS [] = id
-concatS xs@(_:_) = foldr1 (\ f g -> f . g) xs
-
-------------------------------------------------------------------------------
 --- Transforms a list of HTML expressions into string representation.
 showBaseHtmls :: [BaseHtml] -> String
 showBaseHtmls hexps = showsBaseHtmls 0 hexps ""
@@ -1077,7 +1059,7 @@ noEndTags :: [String]
 noEndTags = ["img","input","link","meta"]
 
 showsBaseHtml :: Int -> BaseHtml -> ShowS
-showsBaseHtml _ (BaseText s) = showString s
+showsBaseHtml _ (BaseText s)                 = showString s
 showsBaseHtml i (BaseStruct tag attrs hexps) =
   let maybeLn j = if tagWithLn tag then nl . showTab j else id
    in maybeLn i .
@@ -1090,11 +1072,11 @@ showsBaseHtml i (BaseStruct tag attrs hexps) =
   showExps = if tag=="pre"
                then concatS . map (showsBaseHtml 0)
                else showsBaseHtmls (i+2)
-showsBaseHtml _ (BaseAction  _)      =
+showsBaseHtml _ (BaseAction  _)              =
   error "HTML.Base.showsBaseHtml: BaseAction occurred"
 
 showsBaseHtmls :: Int -> [BaseHtml] -> ShowS
-showsBaseHtmls _ [] = id
+showsBaseHtmls _ []       = id
 showsBaseHtmls i (he:hes) = showsWithLnPrefix he . showsBaseHtmls i hes
  where
   showsWithLnPrefix hexp = let s = textOfBaseHtml hexp
@@ -1108,7 +1090,7 @@ showsBaseHtmls i (he:hes) = showsWithLnPrefix he . showsBaseHtmls i hes
   textOfBaseHtml (BaseStruct _ _ _)    = ""
   textOfBaseHtml (BaseAction _)        = ""
 
-showTab :: Int -> String -> String
+showTab :: Int -> ShowS
 showTab n = showString (take n (repeat ' '))
 
 showsHtmlOpenTag :: String -> Attrs -> String -> ShowS
@@ -1121,9 +1103,16 @@ showsHtmlOpenTag tag attrs close =
                      showString "=\"" . encodeQuotes value . showChar '"'
 
     -- encode double quotes as "&quot;":
-    encodeQuotes [] = id
+    encodeQuotes []                 = id
     encodeQuotes (c:cs) | c=='"'    = showString "&quot;" . encodeQuotes cs
                         | otherwise = showChar c . encodeQuotes cs
+
+nl :: ShowS
+nl = showChar '\n'
+
+concatS :: [ShowS] -> ShowS
+concatS []       = id
+concatS xs@(_:_) = foldr1 (\ f g -> f . g) xs
 
 ------------------------------------------------------------------------------
 --- Transforms HTML page into string representation.
