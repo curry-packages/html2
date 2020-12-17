@@ -3,7 +3,7 @@
 --- in all form definitions.
 ---
 --- @author Michael Hanus
---- @version August 2020
+--- @version December 2020
 ------------------------------------------------------------------------------
 
 module C2C.TransTypedFlatCurryForms
@@ -14,8 +14,8 @@ import Control.Monad     ( when, unless )
 import System.FilePath   ( (</>), (<.>) )
 import System.Process    ( exitWith, system )
 
-import FlatCurry.Annotated.Files
 import FlatCurry.Annotated.Types
+import FlatCurry.TypeAnnotated.Files
 import System.CurryPath  ( lookupModuleSourceInLoadPath )
 
 import C2C.Options
@@ -30,13 +30,14 @@ setFormIDsInTypedFlatCurry opts mname = do
  where
   attachFormIDsInProg (mdir,_) = do
     when (optVerb opts > 1) $ putStr $
-      "Reading TypedFlatCurry of module '" ++ mname ++ "'..."
-    (AProg name imps types funcs ops) <- readTypedFlatCurry mname
+      "Reading TypeAnnotatedFlatCurry of module '" ++ mname ++ "'..."
+    (AProg name imps types funcs ops) <- readTypeAnnotatedFlatCurry mname
     putStrLnInter opts "done!"
-    let newflatname = typedFlatCurryFileName (mdir </> mname) ++ transSuffix
+    let newflatname = typeAnnotatedFlatCurryFileName (mdir </> mname) ++
+                      transSuffix
         tprog       = AProg name imps types (map transFunc funcs) ops
     putStrLnInter opts $ "Writing transformed FlatCurry file..."
-    writeTypedFlatCurryFile newflatname tprog
+    writeTypeAnnotatedFlatCurryFile newflatname tprog
     copyFlatCurryInDir opts mdir mname
 
   transFunc fd@(AFunc fn ar vis te rl) =
@@ -71,7 +72,7 @@ charType = TCons ("Prelude","Char") []
 stringType :: TypeExpr
 stringType = TCons ("Prelude","[]") [charType]
 
---- Copies transformed TypedFlatCurry files.
+--- Copies transformed TypeAnnotatedFlatCurry files.
 copyTransTypedFlatCurry :: Options -> String -> IO ()
 copyTransTypedFlatCurry opts mname = do
   lookupModuleSourceInLoadPath mname >>=
@@ -80,9 +81,10 @@ copyTransTypedFlatCurry opts mname = do
 
 copyFlatCurryInDir :: Options -> String -> String -> IO ()
 copyFlatCurryInDir opts mdir mname = do
-  let flatname    = typedFlatCurryFileName (mdir </> mname)
-      newflatname = typedFlatCurryFileName (mdir </> mname) ++ transSuffix
-  putStrLnInter opts $ "Replacing original TypedFlatCurry file..."
+  let flatname    = typeAnnotatedFlatCurryFileName (mdir </> mname)
+      newflatname = typeAnnotatedFlatCurryFileName (mdir </> mname) ++
+                    transSuffix
+  putStrLnInter opts $ "Replacing original TypeAnnotatedFlatCurry file..."
   cprc <- execVerbCommand opts $
             "/bin/cp \"" ++ newflatname ++ "\" \"" ++ flatname ++ "\""
   -- delete existing Haskell target files for this module:

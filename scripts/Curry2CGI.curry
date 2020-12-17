@@ -5,7 +5,7 @@
 --- for executing cgi scripts.
 ---
 --- @author Michael Hanus
---- @version November 2020
+--- @version December 2020
 ------------------------------------------------------------------------------
 
 module Curry2CGI ( main )
@@ -22,13 +22,13 @@ import System.FilePath    ( (</>), isRelative, takeDirectory )
 import System.IOExts      ( evalCmd )
 import System.Process     ( getPID, exitWith, system )
 
-import FlatCurry.Files           ( readFlatCurry )
-import FlatCurry.Annotated.Files ( readTypedFlatCurry )
+import FlatCurry.Files               ( readFlatCurry )
+import FlatCurry.TypeAnnotated.Files ( readTypeAnnotatedFlatCurry )
 
 import C2C.Options
-import C2C.ExtractForms             ( extractFormsInProg )
-import C2C.TransFlatCurryForms      ( copyTransFlatCurry )
-import C2C.TransTypedFlatCurryForms ( copyTransTypedFlatCurry )
+import C2C.ExtractForms              ( extractFormsInProg )
+import C2C.TransFlatCurryForms       ( copyTransFlatCurry )
+import C2C.TransTypedFlatCurryForms  ( copyTransTypedFlatCurry )
 
 ------------------------------------------------------------------------
 
@@ -105,7 +105,7 @@ compileCGI opts transmods mname = do
     case optSysName opts of
       "pakcs" -> do readFlatCurry mainmod
                     mapM_ (copyTransFlatCurry opts) transmods
-      "kics2" -> do readTypedFlatCurry mainmod
+      "kics2" -> do readTypeAnnotatedFlatCurry mainmod
                     mapM_ (copyTransTypedFlatCurry opts) transmods
 
   cleanMain mainmod = do
