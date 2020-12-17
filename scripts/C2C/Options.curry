@@ -1,18 +1,18 @@
 ------------------------------------------------------------------------------
---- Option process for the `curry2cgi` script.
+--- Option processing for the `curry2cgi` script.
 ---
 --- @author Michael Hanus
---- @version November 2020
+--- @version December 2020
 ------------------------------------------------------------------------------
 
 module C2C.Options
  where
 
-import Control.Monad       ( when, unless )
-import Data.List           ( nub )
-import Language.Curry.Distribution ( installDir )
-import Numeric             ( readNat )
-import System.Process      ( exitWith, system )
+import Control.Monad               ( when, unless )
+import Curry.Compiler.Distribution ( installDir )
+import Data.List                   ( nub )
+import Numeric                     ( readNat )
+import System.Process              ( exitWith, system )
 import System.Console.GetOpt
 
 import AbstractCurry.Types ( QName )
