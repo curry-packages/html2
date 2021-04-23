@@ -7,13 +7,13 @@
 --- to hold some session-specific data.
 ---
 --- @author Michael Hanus
---- @version November 2020
+--- @version April 2021
 ------------------------------------------------------------------------------
 
 module HTML.Session
   ( sessionDataDir, inSessionDataDir
   , sessionCookie, doesSessionExist, withSessionCookie, withSessionCookieInfo
-  , SessionStore, emptySessionStore
+  , SessionStore, emptySessionStore, GlobalSessionStore, globalSessionData
   , getSessionMaybeData, getSessionData
   , putSessionData, removeSessionData, modifySessionData
   ) where
@@ -27,7 +27,7 @@ import System.Environment ( getEnv )
 import Data.Time          (ClockTime, addMinutes, clockTimeToInt, getClockTime )
 
 import Crypto.Hash        ( randomString )
-import Global
+import Data.Global
 import HTML.Base
 
 ------------------------------------------------------------------------------
@@ -60,14 +60,19 @@ sessionLifespan = 60
 sessionCookieName :: String
 sessionCookieName = "currySessionId"
 
---- This global value saves time and last session id.
-lastId :: Global (Int, Int)
-lastId = global (0, 0) (Persistent (inSessionDataDir sessionCookieName))
+--- This global value contains a unique id used to create a fresh id
+--- for each new session. Basically, it contains the clock time (represented
+--- as an integer value) of the time where the last session was created.
+--- Since the clock time might not be precise enough to distinguish
+--- two new sessions, the second component is a counter incremented
+--- whenever two sessions have the same clock time.
+lastId :: GlobalP (Int, Int)
+lastId = globalPersistent (inSessionDataDir sessionCookieName) (0, 0)
 
 
 --- The abstract type to represent session identifiers.
 data SessionId = SessionId String
- deriving Eq
+ deriving (Eq, Read, Show)
 
 getId :: SessionId -> String
 getId (SessionId i) = i
@@ -76,11 +81,11 @@ getId (SessionId i) = i
 getUnusedId :: IO SessionId
 getUnusedId = do
   ensureSessionDataDir
-  (ltime,lsid) <- safeReadGlobal lastId (0,0)
+  (ltime,lsid) <- safeReadGlobalP lastId (0,0)
   clockTime <- getClockTime
   if clockTimeToInt clockTime /= ltime
-    then writeGlobal lastId (clockTimeToInt clockTime, 0)
-    else writeGlobal lastId (clockTimeToInt clockTime, lsid+1)
+    then writeGlobalP lastId (clockTimeToInt clockTime, 0)
+    else writeGlobalP lastId (clockTimeToInt clockTime, lsid+1)
   rans <- randomString 30
   return (SessionId (show (clockTimeToInt clockTime) ++ show (lsid+1) ++ rans))
 
@@ -157,18 +162,28 @@ cookieInfoPage = do
 --- system together with the clock time of the last access.
 --- The clock time is used to remove old data in the store.
 data SessionStore a = SessionStore [(SessionId, Int, a)]
+ deriving (Read,Show)
 
 --- An initial value for the empty session store.
 emptySessionStore :: SessionStore _
 emptySessionStore = SessionStore []
 
+--- A global session store is a persistent global entity containing
+--- a session store with some data.
+type GlobalSessionStore a = GlobalP (SessionStore a)
+
+globalSessionData :: (Read a, Show a) => String -> GlobalSessionStore a
+globalSessionData name =
+  globalPersistent (inSessionDataDir name) emptySessionStore
+
 --- Retrieves data for the current user session stored in a session store.
 --- Returns `Nothing` if there is no data for the current session.
-getSessionMaybeData :: Global (SessionStore a) -> FormReader (Maybe a)
+getSessionMaybeData :: (Read a, Show a) =>
+                       GlobalSessionStore a -> FormReader (Maybe a)
 getSessionMaybeData sessionData = toFormReader $ do
   ensureSessionDataDir
   sid <- getSessionId
-  SessionStore sdata <- safeReadGlobal sessionData emptySessionStore
+  SessionStore sdata <- safeReadGlobalP sessionData emptySessionStore
   return (findInSession sid sdata)
  where
   findInSession si ((id, _, storedData):rest) =
@@ -180,43 +195,45 @@ getSessionMaybeData sessionData = toFormReader $ do
 --- Retrieves data for the current user session stored in a session store
 --- where the second argument is returned if there is no data
 --- for the current session.
-getSessionData :: Global (SessionStore a) -> a -> FormReader a
+getSessionData :: (Read a, Show a) =>
+                  GlobalSessionStore a -> a -> FormReader a
 getSessionData sessiondata defaultdata =
   fmap (fromMaybe defaultdata) (getSessionMaybeData sessiondata)
 
 --- Stores data related to the current user session in a session store.
-putSessionData :: Global (SessionStore a) -> a -> IO ()
+putSessionData :: (Read a, Show a) => GlobalSessionStore a -> a -> IO ()
 putSessionData sessionData newData = do
   ensureSessionDataDir
   sid <- getSessionId
-  SessionStore sdata <- safeReadGlobal sessionData emptySessionStore
+  SessionStore sdata <- safeReadGlobalP sessionData emptySessionStore
   currentTime <- getClockTime
   case findIndex (\ (id, _, _) -> id == sid) sdata of
     Just i ->
-      writeGlobal sessionData
+      writeGlobalP sessionData
         (SessionStore (replace (sid, clockTimeToInt currentTime, newData) i
                                (cleanup currentTime sdata)))
     Nothing ->
-      writeGlobal sessionData
-                  (SessionStore ((sid, clockTimeToInt currentTime, newData)
-                                  : cleanup currentTime sdata))
+      writeGlobalP sessionData
+                   (SessionStore ((sid, clockTimeToInt currentTime, newData)
+                                   : cleanup currentTime sdata))
 
 --- Modifies the data of the current user session.
-modifySessionData :: Global (SessionStore a) -> a -> (a -> a) -> IO ()
+modifySessionData :: (Read a, Show a) =>
+                     GlobalSessionStore a -> a -> (a -> a) -> IO ()
 modifySessionData sessiondata defaultdata upd = do
   sd <- fromFormReader $ getSessionData sessiondata defaultdata
   putSessionData sessiondata (upd sd)
 
 --- Removes data related to the current user session from a session store.
-removeSessionData :: Global (SessionStore a) -> IO ()
+removeSessionData :: (Read a, Show a) => GlobalSessionStore a -> IO ()
 removeSessionData sessionData = do
   ensureSessionDataDir
   sid <- getSessionId
-  SessionStore sdata <- safeReadGlobal sessionData emptySessionStore
+  SessionStore sdata <- safeReadGlobalP sessionData emptySessionStore
   currentTime <- getClockTime
-  writeGlobal sessionData
-              (SessionStore (filter (\ (id, _, _) -> id /= sid)
-                                    (cleanup currentTime sdata)))
+  writeGlobalP sessionData
+               (SessionStore (filter (\ (id, _, _) -> id /= sid)
+                                     (cleanup currentTime sdata)))
 
 -- expects that clockTimeToInt converts time into ascending integers!
 -- we should write our own conversion-function
