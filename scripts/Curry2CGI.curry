@@ -50,12 +50,14 @@ checkCurrySystem opts = do
     error $ "Curry system executable '" ++ currybin ++ "' does not exist!"
   (rc,out,_) <- evalCmd currybin ["--compiler-name"] ""
   unless (rc == 0) $
-    error "Cannot determine kind of Curry system (pakcs,kics2)!"
+    error "Cannot determine kind of Curry system (pakcs,kics2,curry2go)!"
   let sysname = filter (not . isSpace) out
-  if sysname `elem` ["pakcs","kics2"]
-    then return opts { optSysName = sysname }
-    else do putStrLn $ "Unknown Curry system '" ++ sysname ++ "'."
-            exitWith 1
+  case sysname of
+    "pakcs"    -> return opts { optTypedFlat = False }
+    "kics2"    -> return opts { optTypedFlat = True  }
+    "curry2go" -> return opts { optTypedFlat = False }
+    _          -> do putStrLn $ "Unknown Curry system '" ++ sysname ++ "'."
+                     exitWith 1
 
 -- Generate the main program containing the wrapper for all forms
 -- and compile it into a CGI binary.
@@ -77,12 +79,14 @@ compileCGI opts transmods mname = do
   unless (null transmods) $ precompile mainmod
   -- compile main module:
   let curryverb = if optVerb opts == 2 then 1 else optVerb opts
-  cf <- system $ unwords $
-    [ optCPM opts, optSystem opts </> "bin" </> "curry" , "--nocypm" ] ++
-    map (\rcopts -> "-D" ++ rcopts) (optCurryRC opts) ++
-    [ ":set", 'v' : show curryverb ] ++
-    optCurryOpts opts ++
-    [ ":load", mainmod, ":save", maincall, ":quit" ]
+      compilecmd = unwords $
+        [ optCPM opts, optSystem opts </> "bin" </> "curry" , "--nocypm" ] ++
+        map (\rcopts -> "-D" ++ rcopts) (optCurryRC opts) ++
+        [ ":set", 'v' : show curryverb ] ++
+        optCurryOpts opts ++
+        [ ":load", mainmod, ":save", maincall, ":quit" ]
+  putStrLnInter opts $ "Executing: " ++ compilecmd
+  cf <- system compilecmd
   when (cf > 0) $ do
     putStrLn "Error occurred, generation aborted."
     cleanMain mainmod
@@ -102,11 +106,11 @@ compileCGI opts transmods mname = do
     putStrLnInter opts $ "Modules transformed by setting form IDs:\n" ++
                          unwords transmods
     putStrLnInfo opts $ "Pre-compiling " ++ mainmod ++ "..."
-    case optSysName opts of
-      "pakcs" -> do readFlatCurry mainmod
-                    mapM_ (copyTransFlatCurry opts) transmods
-      "kics2" -> do readTypeAnnotatedFlatCurry mainmod
-                    mapM_ (copyTransTypedFlatCurry opts) transmods
+    if optTypedFlat opts
+      then do readTypeAnnotatedFlatCurry mainmod
+              mapM_ (copyTransTypedFlatCurry opts) transmods
+      else do readFlatCurry mainmod
+              mapM_ (copyTransFlatCurry opts) transmods
 
   cleanMain mainmod = do
     system $ unwords [optSystem opts </> "bin" </> "cleancurry", mainmod]

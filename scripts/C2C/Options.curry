@@ -25,7 +25,7 @@ banner :: String
 banner = unlines [bannerLine,bannerText,bannerLine]
  where
   bannerText = "Compile Curry programs with HTML forms to CGI executables " ++
-               "(Version of 17/12/20)"
+               "(Version of 26/04/21)"
   bannerLine = take (length bannerText) (repeat '=')
 
 ------------------------------------------------------------------------------
@@ -39,7 +39,7 @@ data Options = Options
   , optForms     :: [QName]  -- qualified names of form operations
   , optFormMods  :: [String] -- names of modules containing form operations
   , optSystem    :: String   -- path to root of Curry system
-  , optSysName   :: String   -- name of the Curry system ("pakcs", "kics2")
+  , optTypedFlat :: Bool     -- does the Curry compiler require TypedFlatCurry?
   , optCPM       :: String   -- command to invoke Curry Package Manager
   , optCurryRC   :: [String] -- curryrc options
   , optCurryOpts :: [String] -- options passed to the Curry compiler
@@ -48,7 +48,7 @@ data Options = Options
 
 defaultOptions :: Options
 defaultOptions =
-  Options 1 False "" "" [] [] installDir "" "cypm exec"
+  Options 1 False "" "" [] [] installDir False "cypm exec"
           [] [":set -time", ":set -interactive"]
           "-t 120"
 
@@ -110,7 +110,8 @@ options =
   , Option "s" ["system"]
             (ReqArg (\s opts -> opts { optSystem = s }) "<s>")
             ("set path to the root of Curry system so that\n" ++
-             "'<s>/bin/curry' is invoked to compile script\n" ++
+             "'<s>/bin/curry' is invoked to compile script and\n" ++
+             "'<s>/bin/cleancurry' is invoked to clean itermediate files\n" ++
              "(default: '" ++ installDir ++ "')")
   , Option "" ["cpmexec"]
             (ReqArg (\s opts -> opts { optCPM = s }) "<c>")

@@ -175,12 +175,9 @@ checkFormIDsInProg opts mname formnames = do
     else do
       putStrLnInfo opts $
         "Some forms have non-matching IDs: setting correct form IDs..."
-      case optSysName opts of
-        "pakcs" -> setFormIDsInFlatCurry opts mname
-        "kics2" -> setFormIDsInTypedFlatCurry opts mname
-        o       -> do putStrLn $ "Unknown Curry system '" ++ o ++ "'. " ++
-                                 "Cannot set correct form IDs!"
-                      exitWith 1
+      if optTypedFlat opts
+        then setFormIDsInTypedFlatCurry opts mname
+        else setFormIDsInFlatCurry opts mname
       return (Just mname)
 
 -- Test whether all `HtmlFormDef` identifiers in a module are correct,
