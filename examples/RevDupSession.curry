@@ -10,8 +10,8 @@ import HTML.Base
 import HTML.Session
 
 --- The data stored in a session is the string typed into the input field.
-rdInput :: GlobalSessionStore String
-rdInput = globalSessionData "rdInput"
+rdInput :: SessionStore String
+rdInput = sessionStore "rdInput"
 
 -- Example: a form with a text input field and two submit buttons.
 revDupForm :: HtmlFormDef String

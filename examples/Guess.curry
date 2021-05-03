@@ -9,9 +9,8 @@ import HTML.Base
 import HTML.Session
 
 --- The data stored in the session is the number of guesses.
---trials :: GlobalP (SessionStore Int)
-trials :: GlobalSessionStore Int
-trials = globalSessionData "trials"
+trials :: SessionStore Int
+trials = sessionStore "trials"
 
 guessForm :: HtmlFormDef Int
 guessForm = formDef (getSessionData trials 1) guessFormHtml
