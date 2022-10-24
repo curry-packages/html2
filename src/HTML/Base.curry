@@ -17,13 +17,13 @@
 --- is the command calling the Curry Package Manager).
 ---
 --- @author Michael Hanus (with extensions by Bernd Brassel and Marco Comini)
---- @version October 2020
+--- @version October 2022
 ------------------------------------------------------------------------------
 
 {-# OPTIONS_CYMAKE -Wno-incomplete-patterns #-}
 
 module HTML.Base
- ( HTML, htmlText, htmlStruct, hStruct, updAttrs, toBaseHtml,
+ ( HTML, Attrs, htmlText, htmlStruct, hStruct, updAttrs, toBaseHtml,
    HtmlExp(..), BaseHtml(..), toHtmlExp, fromHtmlExp, textOf,
    HtmlPage(..), PageParam(..),
    FormReader, fromFormReader, toFormReader,

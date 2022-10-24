@@ -2,15 +2,58 @@
 --- This module contains a very simple parser for HTML documents.
 ---
 --- @author Michael Hanus
---- @version October 2020
+--- @version October 2022
 ------------------------------------------------------------------------------
 {-# OPTIONS_CYMAKE -Wno-incomplete-patterns #-}
 
-module HTML.Parser ( readHtmlFile, parseHtmlString )
+module HTML.Parser
+  ( StaticHtml(..), fromStaticHtml, toStaticHtml
+  , readHtmlFile, readFileWithHtml, parseHtmlString, parseHtml )
  where
 
 import Data.Char
 import HTML.Base
+
+------------------------------------------------------------------------------
+--- The data type to represent HTML expressions parsed from a string.
+--- It is similar to type `HTML.Base.BaseHtml` except that there
+--- is no constructor `BaseAction` so this type has instances
+--- for standard classes like `Eq`, `Data`, `Read`, and `Show`.
+--- @cons HText s         - a text string without any further structure
+--- @cons HStruct t as hs - a structure with a tag, attributes, and
+---                         HTML expressions inside the structure
+data StaticHtml =
+    HText   String
+  | HStruct String Attrs [StaticHtml]
+ deriving (Eq, Read, Show)
+
+--- Updates the attributes in a basic HTML expression.
+updStaticAttrs :: (Attrs -> Attrs) -> StaticHtml -> StaticHtml
+updStaticAttrs _ (HText s)                 = HText s
+updStaticAttrs f (HStruct tag attrs hexps) = HStruct tag (f attrs) hexps
+
+--- Transforms a `StaticHtml` expression into a `BaseHtml` expression.
+fromStaticHtml :: StaticHtml -> BaseHtml
+fromStaticHtml (HText s)            = BaseText s
+fromStaticHtml (HStruct t attrs hs) = BaseStruct t attrs (map fromStaticHtml hs)
+
+--- Transforms a `BaseHtml` expression into a `StaticHtml` expression
+--- provided that `BaseAction` constructors do not occur (otherwise,
+--- an error is raised).
+toStaticHtml :: BaseHtml -> StaticHtml
+toStaticHtml (BaseText s)           = HText s
+toStaticHtml (BaseStruct t atts hs) = HStruct t atts (map toStaticHtml hs)
+toStaticHtml (BaseAction _)         =
+  error "HTML.Parser.toStaticHtml: BaseAction occurred in base HTML expression"
+
+--- The type of static HTML expressions is an instance of class `HTML`.
+instance HTML StaticHtml where
+  htmlText   = HText
+  htmlStruct = HStruct
+  updAttrs   = updStaticAttrs
+  toBaseHtml = fromStaticHtml
+
+------------------------------------------------------------------------------
 
 --- Reads a file with HTML text and returns the corresponding HTML expressions.
 --- @param file - the name of a file containing HTML text
@@ -19,44 +62,60 @@ import HTML.Base
 readHtmlFile :: String -> IO [BaseHtml]
 readHtmlFile file = readFile file >>= return . parseHtmlString
 
+--- Reads a file containing HTML text and returns the corresponding
+--- `StaticHtml` expressions.
+--- @param file - the name of a file containing HTML text
+--- @return a list of `StaticHtml` expressions (if the file contains exactly
+---         one HTML document, this list should contain exactly one element)
+readFileWithHtml :: String -> IO [StaticHtml]
+readFileWithHtml file = readFile file >>= return . parseHtml
+
 ------------------------------------------------------------------------------
---- Transforms an HTML string into a list of HTML expressions.
+--- Transforms an HTML string into a list of `BaseHTML` expressions.
 --- If the HTML string is a well structured document, the list
 --- of HTML expressions should contain exactly one element.
 parseHtmlString :: String -> [BaseHtml]
-parseHtmlString s = reverse (parseHtmlTokens [] (scanHtmlString s))
+parseHtmlString = map fromStaticHtml . parseHtml
+
+--- Transforms an HTML string into a list of `StaticHTML` expressions.
+--- If the HTML string is a well structured document, the list
+--- of HTML expressions should contain exactly one element.
+parseHtml :: String -> [StaticHtml]
+parseHtml s = reverse (parseHtmlTokens [] (scanHtmlString s))
+
+------------------------------------------------------------------------------
 
 --- The data type for representing HTML tokens.
-data HtmlToken = HText String | HElem String [(String,String)]
+data HtmlToken = HTText String | HTElem String [(String,String)]
 
 -- parse a list of HTML tokens into list of HTML expressions:
 -- (first argument "helems" is a stack of already read tokens)
-parseHtmlTokens :: [BaseHtml] -> [HtmlToken] -> [BaseHtml]
-parseHtmlTokens helems []             = helems
-parseHtmlTokens helems (HText s : hs) =
- parseHtmlTokens (BaseText s : helems) hs
-parseHtmlTokens helems (HElem (t:ts) args : hs) =
- if t == '/'
-   then let (structargs,elems,rest) = splitHtmlElems ts helems
-        in parseHtmlTokens ([BaseStruct ts structargs elems] ++ rest) hs
-   else parseHtmlTokens (BaseStruct (t:ts) args [] : helems) hs
+parseHtmlTokens :: [StaticHtml] -> [HtmlToken] -> [StaticHtml]
+parseHtmlTokens helems []              = helems
+parseHtmlTokens helems (HTText s : hs) =
+ parseHtmlTokens (HText s : helems) hs
+parseHtmlTokens helems (HTElem (t:ts) args : hs) =
+  if t == '/'
+    then let (structargs,elems,rest) = splitHtmlElems ts helems
+         in parseHtmlTokens ([HStruct ts structargs elems] ++ rest) hs
+    else parseHtmlTokens (HStruct (t:ts) args [] : helems) hs
 
 
 -- split the HTML token stack up to a particular token:
-splitHtmlElems :: String -> [BaseHtml]
-               -> ([(String,String)],[BaseHtml],[BaseHtml])
+splitHtmlElems :: String -> [StaticHtml]
+               -> ([(String,String)],[StaticHtml],[StaticHtml])
 splitHtmlElems _ [] = ([],[],[])
-splitHtmlElems tag (BaseText s : hs) =
- let (largs,elems,rest) = splitHtmlElems tag hs
- in (largs, elems ++ [BaseText s], rest)
-splitHtmlElems tag (BaseStruct s args cont@(_:_) : hs) =
- let (largs,elems,rest) = splitHtmlElems tag hs
- in (largs, elems ++ [BaseStruct s args cont], rest)
-splitHtmlElems tag (BaseStruct s args []: hs) =
- if tag==s
-   then (args,[],hs)
-   else let (largs,elems,rest) = splitHtmlElems tag hs
-        in  (largs, elems ++ [BaseStruct s args []], rest)
+splitHtmlElems tag (HText s : hs) =
+  let (largs,elems,rest) = splitHtmlElems tag hs
+  in (largs, elems ++ [HText s], rest)
+splitHtmlElems tag (HStruct s args cont@(_:_) : hs) =
+  let (largs,elems,rest) = splitHtmlElems tag hs
+  in (largs, elems ++ [HStruct s args cont], rest)
+splitHtmlElems tag (HStruct s args []: hs) =
+  if tag==s
+    then (args,[],hs)
+    else let (largs,elems,rest) = splitHtmlElems tag hs
+         in  (largs, elems ++ [HStruct s args []], rest)
 
 
 -- scan an HTML string into list of HTML tokens:
@@ -72,25 +131,25 @@ scanHtmlString s = scanHtml s
               then scanHtmlPre "" (skipFirstNewLine (drop 4 cs))
               else scanHtmlElem [] cs
     else let (initxt,remtag) = break (=='<') (c:cs)
-          in HText initxt : scanHtml remtag
+          in HTText initxt : scanHtml remtag
 
 -- scan an HTML element
 scanHtmlElem :: String -> String -> [HtmlToken]
-scanHtmlElem ct [] = [HText ("&lt;"++ct)] -- incomplete element
+scanHtmlElem ct [] = [HTText ("&lt;"++ct)] -- incomplete element
 scanHtmlElem ct (c:cs)
   | c=='>'    = (if null ct
-                 then HText "&lt;&gt;" -- invalid HTML, but we accept it...
-                 else HElem ct [])  : scanHtmlString cs
+                 then HTText "&lt;&gt;" -- invalid HTML, but we accept it...
+                 else HTElem ct [])  : scanHtmlString cs
   | isSpace c =
      if null ct
-     then HText "&lt; " : scanHtmlString cs -- invalid HTML, but we accept it...
+     then HTText "&lt; " : scanHtmlString cs -- invalid HTML, but we accept it...
      else let (args,rest) = splitAtElement (=='>') (dropWhile isSpace cs)
               revargs = reverse args
            in if null args || head revargs /= '/'
-              then HElem ct (string2args args) : scanHtmlString rest
-              else HElem ct (string2args (reverse (tail revargs)))
-                    : HElem ('/':ct) [] : scanHtmlString rest
-  | c=='/' && head cs == '>' = HElem ct [] : HElem ('/':ct) []
+              then HTElem ct (string2args args) : scanHtmlString rest
+              else HTElem ct (string2args (reverse (tail revargs)))
+                    : HTElem ('/':ct) [] : scanHtmlString rest
+  | c=='/' && head cs == '>' = HTElem ct [] : HTElem ('/':ct) []
                                            : scanHtmlString (tail cs)
   | otherwise = scanHtmlElem (ct++[toLower c]) cs
 
@@ -107,7 +166,7 @@ scanHtmlPre :: String -> String -> [HtmlToken]
 scanHtmlPre _ [] = []  -- errorneous incomplete element
 scanHtmlPre pre (c:cs) =
   if c=='<' && take 5 (map toLower cs) == "/pre>"
-  then HElem "pre" [] : HText (reverse pre) : HElem "/pre" []
+  then HTElem "pre" [] : HTText (reverse pre) : HTElem "/pre" []
        : scanHtmlString (drop 5 cs)
   else scanHtmlPre (c:pre) cs
 
