@@ -55,7 +55,7 @@ module HTML.Base
    radioMain, radioMainOff, radioOther,
    selection, selectionInitial, multipleSelection,
    htmlQuote, htmlIsoUmlauts, addAttr, addAttrs, addClass,
-   showBaseHtmls, showHtmls, showHtml, showHtmlPage,
+   showStaticHtmls, showBaseHtmls, showHtmls, showHtml, showHtmlPage,
    htmlPrelude, htmlTagAttrs,
    getUrlParameter, urlencoded2string, string2urlencoded,
    formatCookie
@@ -1110,12 +1110,20 @@ addClass hexp cls | null cls  = hexp
                   | otherwise = addAttr hexp ("class",cls)
 
 ------------------------------------------------------------------------------
---- Transforms a list of basic HTML expressions into string representation.
+--- Transforms a list of static HTML expressions into its
+--- string representation (in the standard HTML syntax).
+--- Only included for compatibility.
+showStaticHtmls :: [StaticHtml] -> String
+showStaticHtmls = showHtmls
+
+--- Transforms a list of basic HTML expressions into its
+--- string representation (in the standard HTML syntax).
 --- Only included for compatibility.
 showBaseHtmls :: [BaseHtml] -> String
 showBaseHtmls = showHtmls
 
---- Transforms a list of HTML expressions into string representation.
+--- Transforms a list of HTML expressions into its
+--- string representation (in the standard HTML syntax).
 showHtmls :: HTML h => [h] -> String
 showHtmls hexps = showsHtmls 0 hexps ""
 
@@ -1138,12 +1146,12 @@ noEndTags = ["img","input","link","meta"]
 showsHtml :: HTML h => Int -> h -> ShowS
 showsHtml i hexp =
   maybe (maybe (error "HTML.Base.showsHtml: illegal action/event occurred")
-               showBaseStruct
+               showsHtmlStruct
                (fromHtmlStruct hexp))
         showString
         (fromHtmlText hexp)
  where
-  showBaseStruct (tag, attrs, hexps) =
+  showsHtmlStruct (tag, attrs, hexps) =
     let maybeLn j = if tagWithLn tag then nl . showTab j else id
     in maybeLn i .
        (if null hexps && (null attrs || tag `elem` noEndTags)
