@@ -23,7 +23,8 @@
 {-# OPTIONS_CYMAKE -Wno-incomplete-patterns #-}
 
 module HTML.Base
- ( HTML, Attrs, htmlText, htmlStruct, hStruct, updAttrs, toBaseHtml,
+ ( Attrs,
+   HTML, htmlText, htmlStruct, hStruct, updAttrs, fromHtmlText, fromHtmlStruct,
    BaseHtml(..), StaticHtml(..), fromStaticHtml, toStaticHtml,
    HtmlExp(..), toHtmlExp, fromHtmlExp, textOf,
    HtmlPage(..), PageParam(..),
@@ -84,14 +85,15 @@ type Attrs = [(String,String)]
 
 --- A type is an instance of class `HTML` if it has operations to construct
 --- HTML documents, i.e., constructors for basic text strings and
---- structures with tags and attributes, update the attributes in
---- structures, and extracting the basic HTML structure, i.e.,
---- transforming a document into a basic HTML document.
+--- structures with tags and attributes, update the attributes in structures,
+--- and selectors for basic text and structures which returns the contents
+--- of these elements (or `Nothing` for different elements).
 class HTML a where
-  htmlText   :: String -> a
-  htmlStruct :: String -> Attrs -> [a] -> a
-  updAttrs   :: (Attrs -> Attrs) -> a -> a
-  toBaseHtml :: a -> BaseHtml
+  htmlText       :: String -> a
+  htmlStruct     :: String -> Attrs -> [a] -> a
+  updAttrs       :: (Attrs -> Attrs) -> a -> a
+  fromHtmlText   :: a -> Maybe String
+  fromHtmlStruct :: a -> Maybe (String,Attrs,[a])
 
 -- Some useful abbreviations:
 
@@ -134,7 +136,14 @@ instance HTML BaseHtml where
   htmlText   = BaseText
   htmlStruct = BaseStruct
   updAttrs   = updBaseAttrs
-  toBaseHtml = id
+
+  fromHtmlText (BaseText s)       = Just s
+  fromHtmlText (BaseStruct _ _ _) = Nothing
+  fromHtmlText (BaseAction _)     = Nothing
+
+  fromHtmlStruct (BaseText _)          = Nothing
+  fromHtmlStruct (BaseStruct t ats hs) = Just (t,ats,hs)
+  fromHtmlStruct (BaseAction _)        = Nothing
 
 ------------------------------------------------------------------------------
 --- The data type to represent static HTML expressions which can be
@@ -155,7 +164,12 @@ instance HTML StaticHtml where
   htmlText   = HText
   htmlStruct = HStruct
   updAttrs   = updStaticAttrs
-  toBaseHtml = fromStaticHtml
+
+  fromHtmlText (HText s)       = Just s
+  fromHtmlText (HStruct _ _ _) = Nothing
+
+  fromHtmlStruct (HText _)          = Nothing
+  fromHtmlStruct (HStruct t ats hs) = Just (t,ats,hs)
 
 --- Updates the attributes in a basic HTML expression.
 updStaticAttrs :: (Attrs -> Attrs) -> StaticHtml -> StaticHtml
@@ -245,7 +259,18 @@ instance HTML HtmlExp where
   htmlText   = HtmlText
   htmlStruct = HtmlStruct
   updAttrs   = updHtmlAttrs
-  toBaseHtml = fromHtmlExp
+
+  fromHtmlText (HtmlText s)       = Just s
+  fromHtmlText (HtmlStruct _ _ _) = Nothing
+  fromHtmlText (HtmlAction _)     = Nothing
+  fromHtmlText (HtmlEvent  _ _ _) = Nothing
+  fromHtmlText (HtmlInput  _ _)   = Nothing
+
+  fromHtmlStruct (HtmlText _)          = Nothing
+  fromHtmlStruct (HtmlStruct t ats hs) = Just (t,ats,hs)
+  fromHtmlStruct (HtmlAction _)        = Nothing
+  fromHtmlStruct (HtmlEvent  _ _ _)    = Nothing
+  fromHtmlStruct (HtmlInput  _ _)      = Nothing
 
 ------------------------------------------------------------------------------
 --- Extracts the textual contents of a list of HTML expressions.
@@ -253,12 +278,15 @@ instance HTML HtmlExp where
 ---
 ---      textOf [BaseText "xy", BaseStruct "a" [] [BaseText "bc"]] == "xy bc"
 ---
-textOf :: [BaseHtml] -> String
-textOf = unwords . filter (not . null) . map textOfBaseHtml
+textOf :: HTML h => [h] -> String
+textOf = unwords . filter (not . null) . map textOfHtmlElem
  where
-  textOfBaseHtml (BaseText s)          = s
-  textOfBaseHtml (BaseStruct _ _ hs)   = textOf hs
-  textOfBaseHtml (BaseAction _)        = ""
+  textOfHtmlElem he =
+    maybe (maybe ""
+                 (\ (_,_,hs) -> textOf hs)
+                 (fromHtmlStruct he))
+          id
+          (fromHtmlText he)
 
 ------------------------------------------------------------------------------
 -- HTML forms.
@@ -1123,16 +1151,10 @@ showsBaseHtmls :: Int -> [BaseHtml] -> ShowS
 showsBaseHtmls _ []       = id
 showsBaseHtmls i (he:hes) = showsWithLnPrefix he . showsBaseHtmls i hes
  where
-  showsWithLnPrefix hexp = let s = textOfBaseHtml hexp
+  showsWithLnPrefix hexp = let s = maybe "" id (fromHtmlText hexp)
                            in if s /= "" && isSpace (head s)
                                 then nl . showTab i . showString (tail s)
                                 else showsBaseHtml i hexp
-
-  -- get the string contents of an HTML expression:
-  textOfBaseHtml :: BaseHtml -> String
-  textOfBaseHtml (BaseText   s)        = s
-  textOfBaseHtml (BaseStruct _ _ _)    = ""
-  textOfBaseHtml (BaseAction _)        = ""
 
 showTab :: Int -> ShowS
 showTab n = showString (take n (repeat ' '))
