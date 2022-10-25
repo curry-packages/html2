@@ -4,80 +4,28 @@
 --- @author Michael Hanus
 --- @version October 2022
 ------------------------------------------------------------------------------
-{-# OPTIONS_CYMAKE -Wno-incomplete-patterns #-}
 
-module HTML.Parser
-  ( StaticHtml(..), fromStaticHtml, toStaticHtml
-  , readHtmlFile, readFileWithHtml, parseHtmlString, parseHtml )
+module HTML.Parser ( readHtmlFile, parseHtmlString )
  where
 
 import Data.Char
 import HTML.Base
 
 ------------------------------------------------------------------------------
---- The data type to represent HTML expressions parsed from a string.
---- It is similar to type `HTML.Base.BaseHtml` except that there
---- is no constructor `BaseAction` so this type has instances
---- for standard classes like `Eq`, `Data`, `Read`, and `Show`.
---- @cons HText s         - a text string without any further structure
---- @cons HStruct t as hs - a structure with a tag, attributes, and
----                         HTML expressions inside the structure
-data StaticHtml =
-    HText   String
-  | HStruct String Attrs [StaticHtml]
- deriving (Eq, Read, Show)
-
---- Updates the attributes in a basic HTML expression.
-updStaticAttrs :: (Attrs -> Attrs) -> StaticHtml -> StaticHtml
-updStaticAttrs _ (HText s)                 = HText s
-updStaticAttrs f (HStruct tag attrs hexps) = HStruct tag (f attrs) hexps
-
---- Transforms a `StaticHtml` expression into a `BaseHtml` expression.
-fromStaticHtml :: StaticHtml -> BaseHtml
-fromStaticHtml (HText s)            = BaseText s
-fromStaticHtml (HStruct t attrs hs) = BaseStruct t attrs (map fromStaticHtml hs)
-
---- Transforms a `BaseHtml` expression into a `StaticHtml` expression
---- provided that `BaseAction` constructors do not occur (otherwise,
---- an error is raised).
-toStaticHtml :: BaseHtml -> StaticHtml
-toStaticHtml (BaseText s)           = HText s
-toStaticHtml (BaseStruct t atts hs) = HStruct t atts (map toStaticHtml hs)
-toStaticHtml (BaseAction _)         =
-  error "HTML.Parser.toStaticHtml: BaseAction occurred in base HTML expression"
-
---- The type of static HTML expressions is an instance of class `HTML`.
-instance HTML StaticHtml where
-  htmlText   = HText
-  htmlStruct = HStruct
-  updAttrs   = updStaticAttrs
-  toBaseHtml = fromStaticHtml
-
-------------------------------------------------------------------------------
-
 --- Reads a file with HTML text and returns the corresponding HTML expressions.
 --- @param file - the name of a file containing HTML text
 --- @return a list of HTML expressions (if the file contains exactly one
 ---         HTML document, this list should contain exactly one element)
-readHtmlFile :: String -> IO [BaseHtml]
+readHtmlFile :: HTML h => String -> IO [h]
 readHtmlFile file = readFile file >>= return . parseHtmlString
 
---- Reads a file containing HTML text and returns the corresponding
---- `StaticHtml` expressions.
---- @param file - the name of a file containing HTML text
---- @return a list of `StaticHtml` expressions (if the file contains exactly
----         one HTML document, this list should contain exactly one element)
-readFileWithHtml :: String -> IO [StaticHtml]
-readFileWithHtml file = readFile file >>= return . parseHtml
-
-------------------------------------------------------------------------------
 --- Transforms an HTML string into a list of `BaseHTML` expressions.
 --- If the HTML string is a well structured document, the list
 --- of HTML expressions should contain exactly one element.
-parseHtmlString :: String -> [BaseHtml]
+parseHtmlString :: HTML h => String -> [h]
 parseHtmlString = map fromStaticHtml . parseHtml
 
---- Transforms an HTML string into a list of `StaticHTML` expressions.
+--- Transforms an HTML string into a list of `StaticHtml` expressions.
 --- If the HTML string is a well structured document, the list
 --- of HTML expressions should contain exactly one element.
 parseHtml :: String -> [StaticHtml]
@@ -99,6 +47,8 @@ parseHtmlTokens helems (HTElem (t:ts) args : hs) =
     then let (structargs,elems,rest) = splitHtmlElems ts helems
          in parseHtmlTokens ([HStruct ts structargs elems] ++ rest) hs
     else parseHtmlTokens (HStruct (t:ts) args [] : helems) hs
+parseHtmlTokens _ (HTElem [] _ : _) =
+  error "Internal error in HTML.Parser.parseHtmlTokens: empty list in HTElem"
 
 
 -- split the HTML token stack up to a particular token:

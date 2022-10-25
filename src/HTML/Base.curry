@@ -24,7 +24,8 @@
 
 module HTML.Base
  ( HTML, Attrs, htmlText, htmlStruct, hStruct, updAttrs, toBaseHtml,
-   HtmlExp(..), BaseHtml(..), toHtmlExp, fromHtmlExp, textOf,
+   BaseHtml(..), StaticHtml(..), fromStaticHtml, toStaticHtml,
+   HtmlExp(..), toHtmlExp, fromHtmlExp, textOf,
    HtmlPage(..), PageParam(..),
    FormReader, fromFormReader, toFormReader,
    HtmlFormDef, simpleFormDef, simpleFormDefWithID, formDef, formDefWithID,
@@ -81,7 +82,36 @@ defaultEncoding = "utf-8" --"iso-8859-1"
 --- name/value pairs.
 type Attrs = [(String,String)]
 
---- The data type to represent static HTML expressions.
+--- A type is an instance of class `HTML` if it has operations to construct
+--- HTML documents, i.e., constructors for basic text strings and
+--- structures with tags and attributes, update the attributes in
+--- structures, and extracting the basic HTML structure, i.e.,
+--- transforming a document into a basic HTML document.
+class HTML a where
+  htmlText   :: String -> a
+  htmlStruct :: String -> Attrs -> [a] -> a
+  updAttrs   :: (Attrs -> Attrs) -> a -> a
+  toBaseHtml :: a -> BaseHtml
+
+-- Some useful abbreviations:
+
+--- Basic text as an HTML expression.
+--- The text may contain special HTML chars (like &lt;,&gt;,&amp;,&quot;)
+--- which will be quoted so that they appear as in the parameter string.
+htxt :: HTML h => String -> h
+htxt s = htmlText (htmlQuote s)
+
+--- A list of strings represented as a list of HTML expressions.
+--- The strings may contain special HTML chars that will be quoted.
+htxts :: HTML h => [String] -> [h]
+htxts = map htxt
+
+--- An HTML structure with a given tag and no attributes.
+hStruct :: HTML h => String -> [h] -> h
+hStruct tag = htmlStruct tag []
+
+------------------------------------------------------------------------------
+--- The data type to represent static HTML expressions in web scripts.
 --- @cons BaseText s         - a text string without any further structure
 --- @cons BaseStruct t as hs - a structure with a tag, attributes, and
 ---                             HTML expressions inside the structure
@@ -99,27 +129,52 @@ updBaseAttrs _ (BaseText s)                 = BaseText s
 updBaseAttrs f (BaseStruct tag attrs hexps) = BaseStruct tag (f attrs) hexps
 updBaseAttrs _ (BaseAction act)             = BaseAction act
 
---- A type is an instance of class `HTML` if it has operations to construct
---- HTML documents, i.e., constructors for basic text strings and
---- structures with tags and attributes, update the attributes in
---- structures, and extracting the basic HTML structure, i.e.,
---- transforming a document into a basic HTML document.
-class HTML a where
-  htmlText   :: String -> a
-  htmlStruct :: String -> Attrs -> [a] -> a
-  updAttrs   :: (Attrs -> Attrs) -> a -> a
-  toBaseHtml :: a -> BaseHtml
-
---- An HTML structure with a given tag and no attributes.
-hStruct :: HTML h => String -> [h] -> h
-hStruct tag = htmlStruct tag []
-
 --- The type of basic HTML expressions is an instance of class `HTML`.
 instance HTML BaseHtml where
   htmlText   = BaseText
   htmlStruct = BaseStruct
   updAttrs   = updBaseAttrs
   toBaseHtml = id
+
+------------------------------------------------------------------------------
+--- The data type to represent static HTML expressions which can be
+--- persistently stored, e.g., read from or written into files.
+--- It is similar to type `BaseHtml` except that there
+--- is no constructor `BaseAction` so this type has instances
+--- for standard classes like `Eq`, `Data`, `Read`, and `Show`.
+--- @cons HText s         - a text string without any further structure
+--- @cons HStruct t as hs - a structure with a tag, attributes, and
+---                         HTML expressions inside the structure
+data StaticHtml =
+    HText   String
+  | HStruct String Attrs [StaticHtml]
+ deriving (Eq, Read, Show)
+
+--- The type of static HTML expressions is an instance of class `HTML`.
+instance HTML StaticHtml where
+  htmlText   = HText
+  htmlStruct = HStruct
+  updAttrs   = updStaticAttrs
+  toBaseHtml = fromStaticHtml
+
+--- Updates the attributes in a basic HTML expression.
+updStaticAttrs :: (Attrs -> Attrs) -> StaticHtml -> StaticHtml
+updStaticAttrs _ (HText s)                 = HText s
+updStaticAttrs f (HStruct tag attrs hexps) = HStruct tag (f attrs) hexps
+
+--- Transforms a `StaticHtml` expression into a `BaseHtml` expression.
+fromStaticHtml :: HTML h => StaticHtml -> h
+fromStaticHtml (HText s)            = htmlText s
+fromStaticHtml (HStruct t attrs hs) = htmlStruct t attrs (map fromStaticHtml hs)
+
+--- Transforms a `BaseHtml` expression into a `StaticHtml` expression
+--- provided that `BaseAction` constructors do not occur (otherwise,
+--- an error is raised).
+toStaticHtml :: BaseHtml -> StaticHtml
+toStaticHtml (BaseText s)           = HText s
+toStaticHtml (BaseStruct t atts hs) = HStruct t atts (map toStaticHtml hs)
+toStaticHtml (BaseAction _)         =
+  error "HTML.Base.toStaticHtml: BaseAction occurred in base HTML expression"
 
 ------------------------------------------------------------------------------
 -- CGI references and environments.
@@ -518,17 +573,6 @@ expires secs hpage =
 
 ------------------------------------------------------------------------------
 -- some useful abbreviations:
-
---- Basic text as HTML expression.
---- The text may contain special HTML chars (like &lt;,&gt;,&amp;,&quot;)
---- which will be quoted so that they appear as in the parameter string.
-htxt :: HTML h => String -> h
-htxt s = htmlText (htmlQuote s)
-
---- A list of strings represented as a list of HTML expressions.
---- The strings may contain special HTML chars that will be quoted.
-htxts :: HTML h => [String] -> [h]
-htxts = map htxt
 
 --- An empty HTML expression.
 hempty :: HTML h => h
