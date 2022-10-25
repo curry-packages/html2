@@ -55,7 +55,7 @@ module HTML.Base
    radioMain, radioMainOff, radioOther,
    selection, selectionInitial, multipleSelection,
    htmlQuote, htmlIsoUmlauts, addAttr, addAttrs, addClass,
-   showBaseHtmls, showBaseHtml, showHtmlPage,
+   showBaseHtmls, showHtmls, showHtml, showHtmlPage,
    htmlPrelude, htmlTagAttrs,
    getUrlParameter, urlencoded2string, string2urlencoded,
    formatCookie
@@ -176,7 +176,7 @@ updStaticAttrs :: (Attrs -> Attrs) -> StaticHtml -> StaticHtml
 updStaticAttrs _ (HText s)                 = HText s
 updStaticAttrs f (HStruct tag attrs hexps) = HStruct tag (f attrs) hexps
 
---- Transforms a `StaticHtml` expression into a `BaseHtml` expression.
+--- Transforms a `StaticHtml` expression into a generic HTML expression.
 fromStaticHtml :: HTML h => StaticHtml -> h
 fromStaticHtml (HText s)            = htmlText s
 fromStaticHtml (HStruct t attrs hs) = htmlStruct t attrs (map fromStaticHtml hs)
@@ -1110,9 +1110,14 @@ addClass hexp cls | null cls  = hexp
                   | otherwise = addAttr hexp ("class",cls)
 
 ------------------------------------------------------------------------------
---- Transforms a list of HTML expressions into string representation.
+--- Transforms a list of basic HTML expressions into string representation.
+--- Only included for compatibility.
 showBaseHtmls :: [BaseHtml] -> String
-showBaseHtmls hexps = showsBaseHtmls 0 hexps ""
+showBaseHtmls = showHtmls
+
+--- Transforms a list of HTML expressions into string representation.
+showHtmls :: HTML h => [h] -> String
+showHtmls hexps = showsHtmls 0 hexps ""
 
 -- is this a tag where a line break can be safely added?
 tagWithLn :: String -> Bool
@@ -1123,38 +1128,42 @@ tagWithLn t = t/="" &&
                         "form","table","tr","td"]
 
 --- Transforms a single HTML expression into string representation.
-showBaseHtml :: BaseHtml -> String
-showBaseHtml hexp = showsBaseHtml 0 hexp ""
+showHtml :: HTML h => h -> String
+showHtml hexp = showsHtml 0 hexp ""
 
 --- HTML tags that have no end tag in HTML:
 noEndTags :: [String]
 noEndTags = ["img","input","link","meta"]
 
-showsBaseHtml :: Int -> BaseHtml -> ShowS
-showsBaseHtml _ (BaseText s)                 = showString s
-showsBaseHtml i (BaseStruct tag attrs hexps) =
-  let maybeLn j = if tagWithLn tag then nl . showTab j else id
-   in maybeLn i .
-      (if null hexps && (null attrs || tag `elem` noEndTags)
-         then showsHtmlOpenTag tag attrs "/>"
-         else showsHtmlOpenTag tag attrs ">" . maybeLn (i+2) . showExps hexps .
-              maybeLn i . showString "</" . showString tag . showChar '>'
-      ) . maybeLn i
+showsHtml :: HTML h => Int -> h -> ShowS
+showsHtml i hexp =
+  maybe (maybe (error "HTML.Base.showsHtml: illegal action/event occurred")
+               showBaseStruct
+               (fromHtmlStruct hexp))
+        showString
+        (fromHtmlText hexp)
  where
-  showExps = if tag=="pre"
-               then concatS . map (showsBaseHtml 0)
-               else showsBaseHtmls (i+2)
-showsBaseHtml _ (BaseAction  _)              =
-  error "HTML.Base.showsBaseHtml: BaseAction occurred"
+  showBaseStruct (tag, attrs, hexps) =
+    let maybeLn j = if tagWithLn tag then nl . showTab j else id
+    in maybeLn i .
+       (if null hexps && (null attrs || tag `elem` noEndTags)
+          then showsHtmlOpenTag tag attrs "/>"
+          else showsHtmlOpenTag tag attrs ">" . maybeLn (i+2) . showExps hexps .
+               maybeLn i . showString "</" . showString tag . showChar '>'
+       ) . maybeLn i
+   where
+    showExps = if tag=="pre"
+                 then concatS . map (showsHtml 0)
+                 else showsHtmls (i+2)
 
-showsBaseHtmls :: Int -> [BaseHtml] -> ShowS
-showsBaseHtmls _ []       = id
-showsBaseHtmls i (he:hes) = showsWithLnPrefix he . showsBaseHtmls i hes
+showsHtmls :: HTML h => Int -> [h] -> ShowS
+showsHtmls _ []       = id
+showsHtmls i (he:hes) = showsWithLnPrefix he . showsHtmls i hes
  where
   showsWithLnPrefix hexp = let s = maybe "" id (fromHtmlText hexp)
                            in if s /= "" && isSpace (head s)
                                 then nl . showTab i . showString (tail s)
-                                else showsBaseHtml i hexp
+                                else showsHtml i hexp
 
 showTab :: Int -> ShowS
 showTab n = showString (take n (repeat ' '))
@@ -1188,11 +1197,11 @@ showHtmlPage :: HtmlPage -> String
 showHtmlPage (HtmlAnswer _ cont)            = cont
 showHtmlPage (HtmlPage   title params html) =
   htmlPrelude ++
-  showBaseHtml (BaseStruct "html" htmlTagAttrs
-                  [BaseStruct "head" []
-                       ([BaseStruct "title" [] [BaseText (htmlQuote title)]] ++
-                        concatMap pageParam2HTML params),
-                   BaseStruct "body" bodyattrs html])
+  showHtml (BaseStruct "html" htmlTagAttrs
+              [BaseStruct "head" []
+                 ([BaseStruct "title" [] [BaseText (htmlQuote title)]] ++
+                     concatMap pageParam2HTML params),
+               BaseStruct "body" bodyattrs html])
  where
   bodyattrs = [attr | (PageBodyAttr attr) <- params]
 
