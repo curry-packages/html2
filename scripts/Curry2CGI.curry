@@ -5,7 +5,7 @@
 --- for executing cgi scripts.
 ---
 --- @author Michael Hanus
---- @version December 2020
+--- @version March 2023
 ------------------------------------------------------------------------------
 
 module Curry2CGI ( main )
@@ -16,9 +16,10 @@ import Data.Char          ( isSpace )
 import Data.List          ( intercalate, isPrefixOf, nub )
 import Data.Maybe         ( catMaybes )
 import Data.Time          ( calendarTimeToString, getLocalTime )
-import System.Directory   ( createDirectoryIfMissing, doesFileExist )
+import System.Directory   ( createDirectoryIfMissing, doesFileExist
+                          , getAbsolutePath )
 import System.Environment ( getArgs, getEnv )
-import System.FilePath    ( (</>), isRelative, takeDirectory )
+import System.FilePath    ( (</>), isRelative, takeDirectory, takeFileName )
 import System.IOExts      ( evalCmd )
 import System.Process     ( getPID, exitWith, system )
 
@@ -121,14 +122,15 @@ genShellScript :: Options -> String -> IO ()
 genShellScript opts cgifile = do
   system $ "/bin/rm -f " ++ cgifile
   langenv <- getEnv "LANG"
+  cgibase <- if optAbsolute opts then getAbsolutePath cgifile
+                                 else return $ "./" ++ takeFileName cgifile
   let limit = optLimit opts
-      cgibin = (if isRelative cgifile then "./" else "") ++ cgifile ++ ".bin"
       script = unlines $
                  ["#!/bin/sh"] ++
                  (if null langenv then []
                                   else ["LANG=" ++ langenv, "export LANG"]) ++
                  (if null limit then [] else ["ulimit " ++ limit]) ++
-                 ["exec " ++ cgibin ++ " 2>> " ++ cgifile ++ ".log"]
+                 ["exec " ++ cgibase ++ ".bin 2>> " ++ cgibase ++ ".log"]
   writeFile cgifile script
   system $ unwords ["chmod", "755", cgifile]
   return ()

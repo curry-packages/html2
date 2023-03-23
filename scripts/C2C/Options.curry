@@ -2,7 +2,7 @@
 --- Option processing for the `curry2cgi` script.
 ---
 --- @author Michael Hanus
---- @version December 2020
+--- @version March 2023
 ------------------------------------------------------------------------------
 
 module C2C.Options
@@ -25,7 +25,7 @@ banner :: String
 banner = unlines [bannerLine,bannerText,bannerLine]
  where
   bannerText = "Compile Curry programs with HTML forms to CGI executables " ++
-               "(Version of 26/04/21)"
+               "(Version of 18/03/23)"
   bannerLine = take (length bannerText) (repeat '=')
 
 ------------------------------------------------------------------------------
@@ -35,6 +35,7 @@ data Options = Options
   { optVerb      :: Int   -- verbosity (0: quiet, 1: status, 2: interm, 3: all)
   , optHelp      :: Bool     -- if help info should be printed
   , optOutput    :: String   -- name of the cgi program file (with suffix .cgi)
+  , optAbsolute  :: Bool     -- generate cgi script with absolute file names?
   , optMain      :: String   -- the main expression
   , optForms     :: [QName]  -- qualified names of form operations
   , optFormMods  :: [String] -- names of modules containing form operations
@@ -48,7 +49,7 @@ data Options = Options
 
 defaultOptions :: Options
 defaultOptions =
-  Options 1 False "" "" [] [] installDir False "cypm exec"
+  Options 1 False "" False "" [] [] installDir False "cypm exec"
           [] [":set -time", ":set -interactive"]
           "-t 120"
 
@@ -102,6 +103,9 @@ options =
             (ReqArg (\s opts -> opts { optOutput = s }) "<o>")
             ("name of the file (with suffix .cgi) where the cgi\n" ++
              "program should be stored (default: <curry>.cgi)")
+  , Option "a" ["absolute"]
+           (NoArg (\opts -> opts { optAbsolute = True }))
+           "generate script with absolute file names"
   , Option "i" ["include"]
             (ReqArg (\s opts -> opts { optFormMods = optFormMods opts ++ [s] })
                     "<i>")
