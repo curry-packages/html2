@@ -118,8 +118,10 @@ formNotCompiledPage :: String -> HtmlPage
 formNotCompiledPage formid =
   HtmlPage "Form Not Compiled" [PageEnc defaultEncoding]
     [h1 [htxt $ "ERROR: Form \"" ++ formid ++ "\" not compiled!"],
-     par [htxt $ "The form with the identifier above was not compiled! " ++
-                 "Please re-compile the web application with all forms!"]]
+     par [htxt "The form with the identifier above was not compiled!"],
+     par [htxt $ "Please re-compile the web application and add the " ++
+                 "module containing this form as an '--include' parameter " ++
+                 "to the invocation of 'curry2cgi'!"]]
 
 -- Transforms a CGI variable mapping into a CGI environment.
 cgiGetValue :: [(String,String)] -> HtmlEnv
