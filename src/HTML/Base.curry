@@ -49,7 +49,7 @@ module HTML.Base
    hrule, breakline, image,
    styleSheet, style, textstyle, blockstyle, inline, block, hiddenField,
    redirectPage, expires,
-   formElem,
+   formElem, formElemWithAttrs,
    button, resetButton, imageButton, coordinates,
    textField, password, textArea, checkBox, checkedBox,
    radioMain, radioMainOff, radioOther,
@@ -886,14 +886,22 @@ hiddenField name value =
 --- [HTML](https://html.spec.whatwg.org/multipage/forms.html#the-form-element),
 --- the form element itself is a static HTML expression.
 formElem :: HtmlFormDef a -> BaseHtml
-formElem formspec = BaseAction formAction
+formElem formspec = formElemWithAttrs formspec []
+
+--- A form element (see 'formElem') where some attributes are added
+--- to the resulting HTML `form` structure.
+--- The attributes must be different from the standard form
+--- attributes `method` and `action`.
+formElemWithAttrs :: HtmlFormDef a -> Attrs -> BaseHtml
+formElemWithAttrs formspec attrs = BaseAction formAction
  where
   formAction = do
     urlparam <- getUrlParameter
     he       <- genInitForm formspec
     return $
-       HtmlStruct "form" [("method", "post"), ("action", '?' : urlparam)]
-         (hiddenField "FORMID" (formDefId formspec) : fst (instHtmlRefs he 0))
+      HtmlStruct "form"
+        ([("method", "post"), ("action", '?' : urlparam)] ++ attrs)
+        (hiddenField "FORMID" (formDefId formspec) : fst (instHtmlRefs he 0))
 
 --- A button to submit a form with a label string and an event handler.
 button :: String -> HtmlHandler -> HtmlExp
