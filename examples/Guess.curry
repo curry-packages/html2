@@ -38,4 +38,4 @@ main = withSessionCookieInfo $
   headerPage "Number Guessing Game" [ formElem guessForm ]
 
 -- Install the CGI script in user homepage by:
--- > cypm exec curry2cgi -o ~/public_html/cgi-bin/guess.cgi Guess
+-- > curry2cgi -o ~/public_html/cgi-bin/guess.cgi Guess

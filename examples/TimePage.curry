@@ -17,5 +17,5 @@ main :: IO HtmlPage
 main = timePage
 
 -- Install with:
--- > cypm exec curry2cgi -o ~/public_html/cgi-bin/time.cgi TimePage
+-- > curry2cgi -o ~/public_html/cgi-bin/time.cgi TimePage
 

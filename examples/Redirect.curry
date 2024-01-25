@@ -22,6 +22,6 @@ main = return $ page "Redirection"
     formElem redirectForm ]
 
 -- Install with:
--- > cypm exec curry2cgi -o ~/public_html/cgi-bin/redirect.cgi Redirect
+-- > curry2cgi -o ~/public_html/cgi-bin/redirect.cgi Redirect
 
 -------------------------------------------------------------------------

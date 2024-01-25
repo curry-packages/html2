@@ -10,7 +10,7 @@ module C2C.Options
 
 import Control.Monad               ( when, unless )
 import Curry.Compiler.Distribution ( installDir )
-import Data.List                   ( nub )
+import Data.List                   ( isSuffixOf, nub )
 import Numeric                     ( readNat )
 import System.Process              ( exitWith, system )
 import System.Console.GetOpt
@@ -25,7 +25,7 @@ banner :: String
 banner = unlines [bannerLine,bannerText,bannerLine]
  where
   bannerText = "Compile Curry programs with HTML forms to CGI executables " ++
-               "(Version of 18/03/23)"
+               "(Version of 25/01/24)"
   bannerLine = take (length bannerText) (repeat '=')
 
 ------------------------------------------------------------------------------
@@ -49,7 +49,7 @@ data Options = Options
 
 defaultOptions :: Options
 defaultOptions =
-  Options 1 False "" False "" [] [] installDir False "cypm exec"
+  Options 1 False "" False "" [] [] installDir False "cypm"
           [] [":set -time", ":set -interactive"]
           "-t 120"
 
@@ -115,12 +115,12 @@ options =
             (ReqArg (\s opts -> opts { optSystem = s }) "<s>")
             ("set path to the root of Curry system so that\n" ++
              "'<s>/bin/curry' is invoked to compile script and\n" ++
-             "'<s>/bin/cleancurry' is invoked to clean itermediate files\n" ++
+             "'<s>/bin/cleancurry' to clean intermediate files\n" ++
              "(default: '" ++ installDir ++ "')")
-  , Option "" ["cpmexec"]
+  , Option "" ["cpm"]
             (ReqArg (\s opts -> opts { optCPM = s }) "<c>")
-            ("set the command to execute programs with the\n" ++
-             "Curry Package Manager (default: 'cypm exec')")
+            ("set the Curry Package Manager command\n" ++
+             "(default: 'cypm')")
   , Option "D" []
             (ReqArg (\s opts -> opts { optCurryRC = optCurryRC opts ++ [s] })
                     "name=val")

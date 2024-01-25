@@ -35,6 +35,6 @@ main = return $ page "Question"
   ]
 
 -- Install with (note that we need to include forms from `TimeForm`!):
--- > cypm exec curry2cgi -i TimeForm -o ~/public_html/cgi-bin/revduptime.cgi RevDupTime
+-- > curry2cgi -i TimeForm -o ~/public_html/cgi-bin/revduptime.cgi RevDupTime
 
 -------------------------------------------------------------------------

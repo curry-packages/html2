@@ -15,7 +15,7 @@ rdInput = sessionStore "rdInput"
 
 -- Example: a form with a text input field and two submit buttons.
 revDupForm :: HtmlFormDef String
-revDupForm = formDef readInfo formHtml
+revDupForm = formDefWithID "RevDupSession.revDupForm" readInfo formHtml
  where
   readInfo = getSessionData rdInput ""
 
@@ -48,6 +48,6 @@ main = withSessionCookieInfo $ page "Question"
   ]
 
 -- Install with:
--- > cypm exec curry2cgi -o ~/public_html/cgi-bin/revdup.cgi RevDupSession
+-- > curry2cgi -o ~/public_html/cgi-bin/revdup.cgi RevDupSession
 
 -------------------------------------------------------------------------

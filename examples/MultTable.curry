@@ -23,4 +23,4 @@ getMultPage :: IO HtmlPage
 getMultPage = return multPage
 
 -- Install the CGI program by:
--- cypm exec curry2cgi -o ~/public_html/cgi-bin/multdigits.cgi -m getMultPage MultTable
+-- curry2cgi -o ~/public_html/cgi-bin/multdigits.cgi -m getMultPage MultTable

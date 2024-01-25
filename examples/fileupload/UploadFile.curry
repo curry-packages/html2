@@ -42,7 +42,7 @@ main = do
   upfile = "UploadedFile"
 
 -- Install with:
--- > cypm exec curry2cgi -o ~/public_html/cgi-bin/uploadform.cgi UploadFile
+-- > curry2cgi -o ~/public_html/cgi-bin/uploadform.cgi UploadFile
 -- > cp -p upload-handler.cgi ~/public_html/cgi-bin/
 
 -------------------------------------------------------------------------

@@ -20,6 +20,6 @@ main :: IO HtmlPage
 main = return $ headerPage "String length" [formElem lengthForm]
 
 -- Install with:
--- > cypm exec curry2cgi -o ~/public_html/cgi-bin/length.cgi Length
+-- > curry2cgi -o ~/public_html/cgi-bin/length.cgi Length
 
 -------------------------------------------------------------------------

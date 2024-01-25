@@ -33,6 +33,6 @@ entry2html dir e = do
     else return [htxt e]
 
 -- Install with:
--- > cypm exec curry2cgi -o ~/public_html/cgi-bin/browsedir.cgi BrowseDir
+-- > curry2cgi -o ~/public_html/cgi-bin/browsedir.cgi BrowseDir
 --
 -- Call with: http://...CGIBINDIR/browsedir.cgi?<directory (urlencoded)>

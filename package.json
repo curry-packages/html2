@@ -1,6 +1,6 @@
 {
     "name": "html2",
-    "version": "3.4.0",
+    "version": "3.5.0",
     "author": "Michael Hanus <mh@informatik.uni-kiel.de>",
     "synopsis": "Libraries for HTML programming with event-handler-based form processing",
     "category": [ "Web" ],
@@ -32,7 +32,7 @@
         "main": "Curry2CGI"
     },
     "source": {
-        "git": "https://git.ps.informatik.uni-kiel.de/curry-packages/html2.git",
+        "git": "https://github.com/curry-packages/html2.git",
         "tag": "$version"
     }
 }

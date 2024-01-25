@@ -10,7 +10,7 @@ import HTML.Base
 
 -- Example: a form with a text input field and two submit buttons.
 revDupForm :: HtmlFormDef ()
-revDupForm = simpleFormDef
+revDupForm = simpleFormDefWithID "RevDup.revDupForm"
   [ htxt "Enter a string: ", textField ref ""
   , hrule
   , button "Reverse string"   revHandler
@@ -31,6 +31,6 @@ main = return $ page "Question"
   [ h1 [htxt "This is an example form"], formElem revDupForm ]
 
 -- Install with:
--- > cypm exec curry2cgi -o ~/public_html/cgi-bin/revdup.cgi RevDup
+-- > curry2cgi -o ~/public_html/cgi-bin/revdup.cgi RevDup
 
 -------------------------------------------------------------------------

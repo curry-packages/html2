@@ -29,6 +29,6 @@ main :: IO HtmlPage
 main = return $ headerPage "String input" [formElem lengthRevFormDef]
 
 -- Install with:
--- > cypm exec curry2cgi -o ~/public_html/cgi-bin/revlen.cgi RevLength
+-- > curry2cgi -o ~/public_html/cgi-bin/revlen.cgi RevLength
 
 -------------------------------------------------------------------------

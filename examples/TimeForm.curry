@@ -26,6 +26,6 @@ main = return $ page "Time"
   ]
 
 -- Install with:
--- > cypm exec curry2cgi -o ~/public_html/cgi-bin/time.cgi TimeForm
+-- > curry2cgi -o ~/public_html/cgi-bin/time.cgi TimeForm
 
 -------------------------------------------------------------------------
