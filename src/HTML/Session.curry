@@ -197,8 +197,7 @@ getSessionMaybeData sessionData = toFormReader $ do
 --- Retrieves data for the current user session stored in a session store
 --- where the second argument is returned if there is no data
 --- for the current session.
-getSessionData :: (Read a, Show a) =>
-                  SessionStore a -> a -> FormReader a
+getSessionData :: (Read a, Show a) => SessionStore a -> a -> FormReader a
 getSessionData sessiondata defaultdata =
   fmap (fromMaybe defaultdata) (getSessionMaybeData sessiondata)
 

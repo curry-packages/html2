@@ -3,7 +3,7 @@
 --- rendered with [Bootstrap version 4](https://getbootstrap.com/).
 ---
 --- @author Michael Hanus
---- @version September 2020
+--- @version January 2024
 ----------------------------------------------------------------------------
 
 module HTML.Styles.Bootstrap4
@@ -22,6 +22,8 @@ module HTML.Styles.Bootstrap4
  , ehrefWarnBadge, ehrefDangBadge, ehrefLightBadge, ehrefDarkBadge
  , hrefNav, hrefNavActive, ehrefNav, ehref, eTarget
  , kbdInput
+ , staticButton
+ , stdModal, modalLaunchPrimButton, modalClosePrimButton, scriptShowModal
  ) where
 
 import HTML.Base
@@ -405,5 +407,88 @@ eTarget hexp = hexp `addAttr` ("target","_blank")
 --- Render an HTML expression as keyboard or user input.
 kbdInput :: HTML h => [h] -> h
 kbdInput = htmlStruct "kbd" []
+
+----------------------------------------------------------------------------
+-- Support for modal dialogs.
+
+-- A static button (i.e., not a submit button of a form) of type `button`.
+staticButton :: HTML h => [h] -> h
+staticButton = htmlStruct "button" [("type","button")]
+
+-- The basic modal structure:
+modal :: HTML h => String -> String -> [h] -> h
+modal modalId labelId = htmlStruct "div"
+  [("class","modal fade")
+  ,("id",modalId)
+  ,("tabindex","-1")
+  ,("role","dialog")
+  ,("aria-labelledby",labelId)
+  ,("aria-hidden","true")]
+
+modalDialog :: HTML h => [h] -> h
+modalDialog = htmlStruct "div" [("class","modal-dialog")]
+
+modalContent :: HTML h => [h] -> h
+modalContent = htmlStruct "div" [("class","modal-content")]
+
+modalHeader :: HTML h => [h] -> h
+modalHeader = htmlStruct "div" [("class","modal-header")]
+
+modalBody :: HTML h => [h] -> h
+modalBody = htmlStruct "div" [("class","modal-body")]
+
+modalFooter :: HTML h => [h] -> h
+modalFooter = htmlStruct "div" [("class","modal-footer")]
+
+modalDismiss :: (String,String)
+modalDismiss = ("data-dismiss","modal")
+
+modalToggle :: (String,String)
+modalToggle = ("data-toggle","modal")
+
+stdModalClose :: HTML h => h
+stdModalClose =
+  staticButton [htmlText "&times;"]
+   `addAttrs` [ ("class","close"), modalDismiss, ("aria-hidden","true")]
+
+--- Defining a modal dialog where a modal id, the titel, body, and footer
+--- HTML expressions are provided.
+stdModal :: HTML h => String -> [h] -> [h] -> [h] -> h
+stdModal modalId title body footer =
+  modal modalId labelId
+    [modalDialog
+      [modalContent
+        [modalHeader
+          [ htmlStruct "h5" [("class","modal-title")] title
+              `addAttr` ("id",labelId)
+          , stdModalClose]
+        , modalBody body
+        , modalFooter footer]]] -- `addClass` "fade"
+ where labelId = modalId ++ "Label"
+
+--- A primary button to launch a modal dialog where the modal id and
+--- the button text are provided.
+modalLaunchPrimButton :: HTML h => String -> String -> h
+modalLaunchPrimButton modalid btitle =
+  staticButton [htxt btitle]
+    `addAttrs` [ ("class","btn btn-primary"), ("data-toggle", "modal")
+               , ("data-target", '#':modalid)]
+
+--- A primary button to close a modal dialog to be used
+--- inside the modal definition. The argument is the button text.
+modalClosePrimButton :: HTML h => String -> h
+modalClosePrimButton s =
+  staticButton [ htxt s]
+    `addAttrs` [ ("class","btn btn-primary"), ("data-dismiss","modal") ]
+
+--- A JavaScript element which can be put at the end of the page body
+--- in order to show a modal defined in the page after the page is loaded.
+scriptShowModal :: String -> [BaseHtml]
+scriptShowModal modalid =
+  [hStruct "script"
+    [htmlText $ "$(document).ready(function(){ $(\"#" ++ modalid ++
+                "\").modal('show'); });"
+    ]
+  ]
 
 ----------------------------------------------------------------------------

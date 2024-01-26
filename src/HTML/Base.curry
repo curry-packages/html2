@@ -39,6 +39,7 @@ module HTML.Base
    page, headerPage,
    pageEnc, pageCookie, pageCSS, pageMetaInfo,
    pageLinkInfo, pageBodyAttr, addPageParam, addCookies, addHttpHeader,
+   addPageBody,
    htxt, htxts, hempty, nbsp, h1, h2, h3, h4, h5, h6,
    par, section, header, footer, emphasize, strong, bold, italic, nav, code,
    center, blink, teletype, pre, verbatim, address, href, anchor,
@@ -514,6 +515,15 @@ addPageParam :: HtmlPage -> PageParam -> HtmlPage
 addPageParam (HtmlPage title params hexps) param =
   HtmlPage title (param:params) hexps
 addPageParam hexp@(HtmlAnswer _ _) _ = hexp
+
+--- Adds a list of HTML expressions to the body of an HTML page.
+--- @param page - a page
+--- @param hexps - HTML expressions added at the end of the page's body
+--- @return an HTML page
+addPageBody :: HtmlPage -> [BaseHtml] -> HtmlPage
+addPageBody (HtmlPage title params hexps) morehexps =
+  HtmlPage title params (hexps ++ morehexps)
+addPageBody hpage@(HtmlAnswer _ _) _ = hpage
 
 --- Adds simple cookie to an HTML page.
 --- The cookies are sent to the client's browser together with this page.
