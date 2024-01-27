@@ -451,10 +451,12 @@ stdModalClose =
   staticButton [htmlText "&times;"]
    `addAttrs` [ ("class","close"), modalDismiss, ("aria-hidden","true")]
 
---- Defining a modal dialog where a modal id, the titel, body, and footer
+--- Defining a modal dialog where a modal id, the title, body, and footer
 --- HTML expressions are provided.
-stdModal :: HTML h => String -> [h] -> [h] -> [h] -> h
-stdModal modalId title body footer =
+--- If the first argument is `True`, then the modal dialog
+--- will not close when clicking outside it.
+stdModal :: HTML h => Bool -> String -> [h] -> [h] -> [h] -> h
+stdModal staticbackdrop modalId title body footer =
   modal modalId labelId
     [modalDialog
       [modalContent
@@ -463,7 +465,11 @@ stdModal modalId title body footer =
               `addAttr` ("id",labelId)
           , stdModalClose]
         , modalBody body
-        , modalFooter footer]]] -- `addClass` "fade"
+        , modalFooter footer]]]
+   `addAttrs`
+     (if staticbackdrop
+        then [("data-backdrop","static"), ("data-keyboard","false")]
+        else [])
  where labelId = modalId ++ "Label"
 
 --- A primary button to launch a modal dialog where the modal id and
