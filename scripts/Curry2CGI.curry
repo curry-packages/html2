@@ -5,7 +5,7 @@
 --- for executing cgi scripts.
 ---
 --- @author Michael Hanus
---- @version January 2024
+--- @version March 2024
 ------------------------------------------------------------------------------
 
 module Curry2CGI ( main )
@@ -15,10 +15,12 @@ import Control.Monad      ( when, unless )
 import Data.Char          ( isSpace )
 import Data.List          ( intercalate, isPrefixOf, nub )
 import Data.Maybe         ( catMaybes )
+import System.Environment ( getArgs, getEnv )
+
 import Data.Time          ( calendarTimeToString, getLocalTime )
+import System.CurryPath   ( setCurryPath )
 import System.Directory   ( createDirectoryIfMissing, doesFileExist
                           , getAbsolutePath )
-import System.Environment ( getArgs, getEnv, setEnv )
 import System.FilePath    ( (</>), isRelative, takeDirectory, takeFileName )
 import System.IOExts      ( evalCmd )
 import System.Process     ( getPID, exitWith, system )
@@ -38,7 +40,7 @@ main = do
   args <- getArgs
   (opts0,prog) <- processOptions args
   opts <- checkCurrySystem opts0
-  setCurryPath opts
+  setCurryPath (optVerb opts < 2) (optCPM opts)
   modformops <- mapM (extractFormsInProg opts) (optFormMods opts)
   let (mbmods,formops) = unzip modformops
       transmods        = catMaybes mbmods
@@ -60,27 +62,6 @@ checkCurrySystem opts = do
     "curry2go" -> return opts { optTypedFlat = False }
     _          -> do putStrLn $ "Unknown Curry system '" ++ sysname ++ "'."
                      exitWith 1
-
--- Sets the environment variable `CURRYPATH` to the value computed by
--- `cypm deps --path` if it was not already set.
--- Hence, `curry2cgi` can be invoked without the explicit use of `cypm exec`.
-setCurryPath :: Options -> IO ()
-setCurryPath opts = do
-  let cpm = optCPM opts
-  cp <- getEnv "CURRYPATH"
-  when (null cp) $ do
-    putStrLnInfo opts $ "Computing CURRYPATH with '" ++ cpm ++ "'..."
-    (rc,out,err) <- evalCmd cpm ["deps","--path"] ""
-    if rc==0
-      then do let cpath = strip out
-              putStrLnDetail opts $ "CURRYPATH=" ++ cpath
-              setEnv "CURRYPATH" cpath
-      else putStrLn $ "ERROR during computing CURRYPATH with 'cypm':\n" ++
-                      out ++ err
- where
-  -- Remove leading and trailing whitespace
-  strip = reverse . dropWhile isSpace . reverse . dropWhile isSpace
-
 
 -- Generate the main program containing the wrapper for all forms
 -- and compile it into a CGI binary.
