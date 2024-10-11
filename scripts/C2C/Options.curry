@@ -2,7 +2,7 @@
 --- Option processing for the `curry2cgi` script.
 ---
 --- @author Michael Hanus
---- @version March 2023
+--- @version October 2024
 ------------------------------------------------------------------------------
 
 module C2C.Options
@@ -25,7 +25,7 @@ banner :: String
 banner = unlines [bannerLine,bannerText,bannerLine]
  where
   bannerText = "Compile Curry programs with HTML forms to CGI executables " ++
-               "(Version of 25/01/24)"
+               "(Version of 11/10/24)"
   bannerLine = take (length bannerText) (repeat '=')
 
 ------------------------------------------------------------------------------
@@ -70,7 +70,8 @@ processOptions argv = do
                                           else optMain opts }
            in return (opts1, mname)
     []  -> error $ "Name of main module missing!"
-    _   -> error $ "Please provide only one main module!"
+    _   -> error $ "Too many main modules: " ++ unwords args ++
+                   "\nPlease provide only one main module!"
  where
   printUsage = putStrLn (banner ++ "\n" ++ usageText)
 
