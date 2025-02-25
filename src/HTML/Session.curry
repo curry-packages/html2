@@ -160,7 +160,7 @@ cookieInfoPage = do
 --- The type of session data which represents the data used in a session.
 --- The session data consists of a list of data items for each session in the
 --- system together with the clock time of the last access.
---- The clock time is used to remove old data in the store.
+--- The clock time is used to delete old data in the store.
 data SessionData a = SessionData [(SessionId, Int, a)]
  deriving (Read,Show)
 

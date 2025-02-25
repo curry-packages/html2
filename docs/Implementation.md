@@ -13,7 +13,7 @@ fields do not require explicit names so that the consistency
 of input fields and their event handlers can be controlled
 by the Curry compiler. This technique exploits the functional logic
 features of Curry and is explained in detail in
-[this paper](http://www.informatik.uni-kiel.de/~mh/papers/PADL01.html).
+[this paper](https://doi.org/10.1007/3-540-45241-9_6).
 
 This idea is implemented by starting the same executable for
 generating and processing a form. Therefore, the `action`
@@ -80,9 +80,8 @@ do the following:
    are identical to the qualified names of the operations defining
    the form IDs.
 
-3. If some form IDs are not correct, transform the FlatCurry program
-   (in case of KiCS2, the Typed FlatCurry program) of `m` so that
-   correct form IDs are set in the transformed program.
+3. If some form IDs are not correct, transform the (Typed) FlatCurry program
+   of `m` so that correct form IDs are set in the transformed program.
 
 After this phase, pre-compile the main module so that all
 (Typed) FlatCurry files are generated. Then copy the transformed
@@ -91,4 +90,7 @@ programs into the original programs and compile the main module.
 *Important note:*
 Due to a problem in the front end (which unecessarily re-compiles
 TypedFlatCurry files used by KiCS2), the transformation of
-TypedFlatCurry programs do not always work with KiCS2.
+FlatCurry programs (step 3 above) is only supported by PAKCS.
+Thus, if PAKCS is not used, the correct IDs should be provided
+in all definition of forms. This requirement will be checked by `curry2cgi`.
+

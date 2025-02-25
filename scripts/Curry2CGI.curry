@@ -5,7 +5,7 @@
 --- for executing cgi scripts.
 ---
 --- @author Michael Hanus
---- @version March 2024
+--- @version February 2025
 ------------------------------------------------------------------------------
 
 module Curry2CGI ( main )
@@ -57,7 +57,7 @@ checkCurrySystem opts = do
     error "Cannot determine kind of Curry system (pakcs,kics2,curry2go)!"
   let sysname = filter (not . isSpace) out
   case sysname of
-    "pakcs"    -> return opts { optTypedFlat = False }
+    "pakcs"    -> return opts { optTypedFlat = False, optFixForms = True }
     "kics2"    -> return opts { optTypedFlat = True  }
     "curry2go" -> return opts { optTypedFlat = False }
     _          -> do putStrLn $ "Unknown Curry system '" ++ sysname ++ "'."

@@ -4,7 +4,7 @@
 --- necessary.
 ---
 --- @author Michael Hanus
---- @version November 2020
+--- @version February 2025
 ------------------------------------------------------------------------------
 
 module C2C.ExtractForms ( extractFormsInProg )
@@ -62,6 +62,11 @@ extractFormsInProg opts mname =
                 removeFile formfile
                 extractWithFormCache (mdir,mfile)
 
+--- Extract and check all forms defined in a Curry module (second argument)
+--- and write the information about forms into the form file (third argument).
+--- Returns the qualified names of the exported forms as the second component.
+--- The first component is `Nothing` when the module was not transformed
+--- to attach form ids, otherwise it is `Just` the module name.
 readFormsInProg :: Options -> String -> String -> IO (Maybe String, [QName])
 readFormsInProg opts mname formfile = do
   putStrLnInfo opts $
@@ -95,27 +100,27 @@ extractFormOps prog =
     CTApply (CTCons tc) _ -> tc == formDefTypeName
     _                     -> False
 
-
 ------------------------------------------------------------------------------
--- Check whether all `HTML.Base.formElem` calls are applied to
+-- Check whether all `HTML.Base.formElem(WithAttrs)` calls are applied to
 -- top-level public form definitions.
 -- The second argument is the list of public form definitions of the
 -- current module.
+-- If there are some errors, they are reported and the program is terminated
+-- with an error status.
 checkFormElemCallsInProg :: Options -> [QName] -> CurryProg -> IO ()
 checkFormElemCallsInProg opts formnames prog = do
   let mname    = progName prog
       fdecls   = functions prog
       errfuncs = concatMap (checkFormElemCallsInFunc opts formnames mname)
                            fdecls
-  unless (null errfuncs) $ do
-    putStrLn $ "ERROR: Illegal use of 'HTML.Base.formElem' in:\n" ++
-               unlines (map formatErr errfuncs)
-    exitWith 1
+  unless (null errfuncs) (mapM_ formatErr errfuncs >> exitWith 1)
  where
-  formatErr (qn,reason) = "'" ++ showQName qn ++ "': " ++ reason
+  formatErr (inqn,fe,reason) = putStrLn $
+    "ERROR: Illegal use of '" ++ showQName fe ++ "' in '" ++ showQName inqn ++
+    "':\n" ++ reason
 
 checkFormElemCallsInFunc :: Options -> [QName] -> String -> CFuncDecl
-                         -> [(QName,String)]
+                         -> [(QName,QName,String)]
 checkFormElemCallsInFunc _ formnames mname fdecl =
   concatMap checkRule (funcRules fdecl)
  where
@@ -128,7 +133,7 @@ checkFormElemCallsInFunc _ formnames mname fdecl =
 
   checkExp (CVar _)            = []
   checkExp (CLit _)            = []
-  checkExp (CSymbol _)         = []
+  checkExp (CSymbol qf)        = checkSymbol qf
   checkExp (CApply e1 e2)      = checkApply e1 e2
   checkExp (CLambda _ le)      = checkExp le
   checkExp (CLetDecl ld le)    = concatMap checkLDecl ld ++ checkExp le
@@ -140,17 +145,20 @@ checkFormElemCallsInFunc _ formnames mname fdecl =
   checkExp (CRecConstr _ upds) = concatMap (checkExp . snd) upds
   checkExp (CRecUpdate e upds) = checkExp e ++ concatMap (checkExp . snd) upds
 
+  checkSymbol f | isFormElem f = [(funcName fdecl, f, notoplevelerr)]
+                | otherwise    = []
+   where notoplevelerr = "not applied to top-level operation"
+
   checkApply e1 e2 = case (e1,e2) of
-    (CSymbol f1, CSymbol f2)  -> if f1 /= hfe || fst f2 /= mname ||
-                                    f2 `elem` formnames
-                                   then []
-                                   else [(funcName fdecl, opnotfounderr)]
-    (CSymbol f, _) | f == hfe -> [(funcName fdecl, notoplevelerr)]
-    _                         -> checkExp e1 ++ checkExp e2
-   where
-    hfe           = ("HTML.Base","formElem")
-    opnotfounderr = "not applied to exported form operation"
-    notoplevelerr = "not applied to top-level operation"
+    (CSymbol f1, CSymbol f2)
+      | isFormElem f1 -> if fst f2 /= mname || f2 `elem` formnames
+                           then []
+                           else [(funcName fdecl, f2, opnotfounderr)]
+    _                 -> checkExp e1 ++ checkExp e2
+   where opnotfounderr = "not applied to exported form operation"
+
+  isFormElem qf = qf `elem` [ ("HTML.Base","formElem")
+                            , ("HTML.Base","formElemWithAttrs")]
 
   checkStat (CSExpr e)  = checkExp e
   checkStat (CSPat _ e) = checkExp e
@@ -172,13 +180,16 @@ checkFormIDsInProg opts mname formnames = do
   fidok <- testFormIDsInProg opts mname formnames
   if fidok
     then return Nothing
-    else do
-      putStrLnInfo opts $
-        "Some forms have non-matching IDs: setting correct form IDs..."
-      if optTypedFlat opts
-        then setFormIDsInTypedFlatCurry opts mname
-        else setFormIDsInFlatCurry opts mname
-      return (Just mname)
+    else
+      if not (optFixForms opts)
+        then exitWith 1
+        else do
+          putStrLnInfo opts $
+            "Some forms have non-matching IDs: setting correct form IDs..."
+          if optTypedFlat opts
+            then setFormIDsInTypedFlatCurry opts mname
+            else setFormIDsInFlatCurry opts mname
+          return (Just mname)
 
 -- Test whether all `HtmlFormDef` identifiers in a module are correct,
 -- i.e., are identical to the string representation of their defining
@@ -193,7 +204,7 @@ testFormIDsInProg opts mname formnames = do
         , "import HTML.Base"
         , "import System.Process ( exitWith )"
         , ""
-        , checkFormIDDefinition
+        , checkFormIDDefinition opts
         , ""
         , "main :: IO ()"
         , "main = do"
@@ -218,16 +229,19 @@ testFormIDsInProg opts mname formnames = do
     let s = showQName qn
     in "checkFormID (" ++ s ++ ",\"" ++ s ++ "\")"
 
-checkFormIDDefinition :: String
-checkFormIDDefinition = unlines
- ["checkFormID :: (HtmlFormDef a, String) -> IO Bool"
- ,"checkFormID (fd, s) ="
- ,"  if (formDefId fd == s)"
- ,"    then return True"
- ,"    else do"
- ,"      putStrLn (\"Warning: Form definition '\" ++ s ++ \"' has non-matching ID\")"
- ,"      return False"
+checkFormIDDefinition :: Options -> String
+checkFormIDDefinition opts = unlines
+ [ "checkFormID :: (HtmlFormDef a, String) -> IO Bool"
+ , "checkFormID (fd, s) = do"
+ , "  let fid = formDefId fd"
+ , "  if fid == s"
+ , "    then return True"
+ , "    else do"
+ , "      putStrLn $ \"" ++ warn ++
+            ": Form definition '\" ++ s ++ \"' has non-matching ID: \" ++ fid"
+ , "      return False"
  ]
+ where warn = if optFixForms opts then "WARNING" else "ERROR"
 
 {-
 ------------------------------------------------------------------------------
@@ -238,11 +252,12 @@ import System ( exitWith )
 import HTML.Base
 
 checkFormID :: (HtmlFormDef a, String) -> IO Bool
-checkFormID (fd, s) =
-  if (formDefId fd == s)
+checkFormID (fd, s) = do
+  let fid = formDefId fd
+  if fid == s
     then return True
     else do
-      putStrLn $ "Warning: Form definition '" ++ s ++ "' has non-matching ID."
+      putStrLn $ "Warning: Form definition '" ++ s ++ "' has non-matching ID: " ++ fid
       return False
 
 -}

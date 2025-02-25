@@ -2,7 +2,7 @@
 --- Option processing for the `curry2cgi` script.
 ---
 --- @author Michael Hanus
---- @version October 2024
+--- @version February 2025
 ------------------------------------------------------------------------------
 
 module C2C.Options
@@ -25,7 +25,7 @@ banner :: String
 banner = unlines [bannerLine,bannerText,bannerLine]
  where
   bannerText = "Compile Curry programs with HTML forms to CGI executables " ++
-               "(Version of 11/10/24)"
+               "(Version of 25/02/25)"
   bannerLine = take (length bannerText) (repeat '=')
 
 ------------------------------------------------------------------------------
@@ -40,6 +40,8 @@ data Options = Options
   , optForms     :: [QName]  -- qualified names of form operations
   , optFormMods  :: [String] -- names of modules containing form operations
   , optSystem    :: String   -- path to root of Curry system
+  , optFixForms  :: Bool     -- should wrong form IDs be fixed by transforming
+                             -- the (Typed)FlatCurry program?
   , optTypedFlat :: Bool     -- does the Curry compiler require TypedFlatCurry?
   , optCPM       :: String   -- command to invoke Curry Package Manager
   , optCurryRC   :: [String] -- curryrc options
@@ -49,7 +51,7 @@ data Options = Options
 
 defaultOptions :: Options
 defaultOptions =
-  Options 1 False "" False "" [] [] installDir False "cypm"
+  Options 1 False "" False "" [] [] installDir False False "cypm"
           [] [":set -time", ":set -interactive"]
           "-t 120"
 

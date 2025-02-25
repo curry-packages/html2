@@ -49,8 +49,11 @@ Known bugs:
 The automatic addition of form IDs with the script `curry2cgi`
 does not work completely with KiCS2 due to a problem in the front end
 which unecessarily re-compiles TypedFlatCurry files used by KiCS2.
-Thus, it is safer (and more efficient) to use `formDefWithID`
-to define forms.
+Thus, if PAKCS is not used, the correct IDs should be provided
+in all definition of forms, i.e., `formDefWithID` should be used
+to define forms (which is also more efficient).
+This requirement will be checked by `curry2cgi`, i.e., if `formDefWithID`
+is not used or used with a wrong identifier, an error is reported.
 
 --------------------------------------------------------------------------
 

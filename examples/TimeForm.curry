@@ -3,6 +3,8 @@
 -- a form with button to show the current time
 ------------------------------------------------------------------------------
 
+module TimeForm where
+
 import Data.Time -- from package `time`
 import HTML.Base
 

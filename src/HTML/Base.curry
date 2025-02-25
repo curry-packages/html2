@@ -559,7 +559,7 @@ data CookieParam = CookieExpire ClockTime
 formatCookie :: (String,String,[CookieParam]) -> String
 formatCookie (name,value,params) =
   "Set-Cookie: " ++ name ++ "=" ++ string2urlencoded value ++
-  concatMap (\p->"; "++formatCookieParam p) params
+  concatMap (\p -> "; " ++ formatCookieParam p) params
 
 -- Formats a cookie parameter:
 formatCookieParam :: CookieParam -> String
@@ -1272,7 +1272,7 @@ getUrlParameter = getEnv "QUERY_STRING"
 
 --- Translates an URL encoded string into equivalent ASCII string.
 urlencoded2string :: String -> String
-urlencoded2string [] = []
+urlencoded2string []     = []
 urlencoded2string (c:cs)
   | c == '+'  = ' ' : urlencoded2string cs
   | c == '%'  = chr (case readHex (take 2 cs) of [(n,"")] -> n
@@ -1286,11 +1286,12 @@ string2urlencoded [] = []
 string2urlencoded (c:cs)
   | isAlphaNum c = c : string2urlencoded cs
   | c == ' '     = '+' : string2urlencoded cs
-  | otherwise = let oc = ord c
+  | otherwise
+  = let oc = ord c
     in '%' : int2hex(oc `div` 16) : int2hex(oc `mod` 16) : string2urlencoded cs
  where
-   int2hex i = if i<10 then chr (ord '0' + i)
-                       else chr (ord 'A' + i - 10)
+  int2hex i = if i<10 then chr (ord '0' + i)
+                      else chr (ord 'A' + i - 10)
 
 
 ------------------------------------------------------------------------------
