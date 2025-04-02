@@ -5,7 +5,7 @@
 --- to compile Curry CGI scripts into executables.
 ---
 --- @author Michael Hanus
---- @version September 2020
+--- @version April 2025
 ------------------------------------------------------------------------------
 
 module HTML.CGI.Exec ( printMainPage, execFormDef )
@@ -16,6 +16,7 @@ import Data.List          ( intercalate, split )
 import Numeric            ( readHex, readNat )
 import System.Environment ( getEnv )
 import System.IO          ( hPutStrLn, stderr )
+import Network.URL        ( urlencoded2string )
 
 import HTML.Base
 

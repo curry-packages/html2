@@ -11,6 +11,7 @@ import Data.Char
 import Data.List
 
 import HTML.Base
+import Network.URL ( string2urlencoded )
 
 --- General categorization of a list of entries.
 ---

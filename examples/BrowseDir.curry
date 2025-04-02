@@ -6,12 +6,13 @@
 -- Subdirectories are presented as links to browse them.
 --
 -- @author Michael Hanus
--- @version November 2020
+-- @version April 2025
 ------------------------------------------------------------------------------
 
 import System.Directory -- from package `directory`
 
 import HTML.Base
+import Network.URL ( string2urlencoded, urlencoded2string )
 
 main :: IO HtmlPage
 main = do

@@ -17,8 +17,9 @@
         "global"                  : ">= 3.1.0, < 4.0.0",
         "io-extra"                : ">= 3.0.0, < 4.0.0",
         "process"                 : ">= 3.0.0, < 4.0.0",
-        "time"                    : ">= 3.0.0, < 4.0.0"
-    },
+        "time"                    : ">= 3.0.0, < 4.0.0",
+        "url-base"                : ">= 0.1.0"
+     },
     "sourceDirs": [ "src", "scripts" ],
     "exportedModules": [ "HTML.Base",
                          "HTML.CategorizedList", "HTML.LaTeX",

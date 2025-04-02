@@ -3,11 +3,13 @@
 --- The [PADL 2001 paper](https://doi.org/10.1007/3-540-45241-9_6)
 --- contains a description of the basic ideas behind an old version
 --- of this library.
+--- The structure and ideas of the current library are described in the
+--- [PADL 2021 paper](https://doi.org/10.1007/978-3-030-67438-0_7).
 ---
 --- An application written with this library can be transformed into
 --- a cgi script by the command
 ---
----     > cypm exec curry2cgi -m mainPage -o /home/joe/cgi-bin/prog.cgi Prog
+---     > curry2cgi -m mainPage -o /home/joe/cgi-bin/prog.cgi Prog
 ---
 --- where `Prog` is the name of the Curry program with
 --- the cgi script, `/home/joe/cgi-bin/prog.cgi` is
@@ -17,7 +19,7 @@
 --- is the command calling the Curry Package Manager).
 ---
 --- @author Michael Hanus (with extensions by Bernd Brassel and Marco Comini)
---- @version October 2022
+--- @version April 2025
 ------------------------------------------------------------------------------
 
 {-# OPTIONS_CYMAKE -Wno-incomplete-patterns #-}
@@ -58,15 +60,14 @@ module HTML.Base
    htmlQuote, htmlIsoUmlauts, addAttr, addAttrs, addClass,
    showStaticHtmls, showBaseHtmls, showHtmls, showHtml, showHtmlPage,
    htmlPrelude, htmlTagAttrs,
-   getUrlParameter, urlencoded2string, string2urlencoded,
-   formatCookie
+   getUrlParameter, formatCookie
  ) where
 
 import Data.Char          ( isAlphaNum, isSpace )
 import Numeric            ( readNat, readHex )
 import System.Environment ( getEnv )
 import Data.Time          ( CalendarTime(..), ClockTime, toTimeString, toUTCTime )
-
+import Network.URL        ( string2urlencoded, urlencoded2string )
 infixl 0 `addAttr`
 infixl 0 `addAttrs`
 infixl 0 `addClass`
@@ -1264,35 +1265,10 @@ htmlTagAttrs = [("lang","en")]
 --- returned by this I/O action.
 --- Note that an URL parameter should be "URL encoded" to avoid
 --- the appearance of characters with a special meaning.
---- Use the functions "urlencoded2string" and "string2urlencoded"
+--- Use `urlencoded2string` and `string2urlencoded` from `Network.URL`
 --- to decode and encode such parameters, respectively.
-
 getUrlParameter :: IO String
 getUrlParameter = getEnv "QUERY_STRING"
-
---- Translates an URL encoded string into equivalent ASCII string.
-urlencoded2string :: String -> String
-urlencoded2string []     = []
-urlencoded2string (c:cs)
-  | c == '+'  = ' ' : urlencoded2string cs
-  | c == '%'  = chr (case readHex (take 2 cs) of [(n,"")] -> n
-                                                 _        -> 0)
-                 : urlencoded2string (drop 2 cs)
-  | otherwise = c : urlencoded2string cs
-
---- Translates arbitrary strings into equivalent URL encoded strings.
-string2urlencoded :: String -> String
-string2urlencoded [] = []
-string2urlencoded (c:cs)
-  | isAlphaNum c = c : string2urlencoded cs
-  | c == ' '     = '+' : string2urlencoded cs
-  | otherwise
-  = let oc = ord c
-    in '%' : int2hex(oc `div` 16) : int2hex(oc `mod` 16) : string2urlencoded cs
- where
-  int2hex i = if i<10 then chr (ord '0' + i)
-                      else chr (ord 'A' + i - 10)
-
 
 ------------------------------------------------------------------------------
 --- Gets the cookies sent from the browser for the current CGI script.
@@ -1311,10 +1287,11 @@ parseCookies str =
     then []
     else let (c1,cs) = break (==';') str
          in parseCookie c1 :
-            parseCookies (dropWhile (==' ') (if cs=="" then "" else tail cs))
+            parseCookies (dropWhile (==' ') (if null cs then "" else tail cs))
  where
-  parseCookie s = let (name,evalue) = break (=='=') s in
-      (name, if evalue=="" then "" else urlencoded2string (tail evalue))
+  parseCookie s =
+    let (name,evalue) = break (=='=') s
+    in (name, if null evalue then "" else urlencoded2string (tail evalue))
 
 --- For image buttons: retrieve the coordinates where the user clicked
 --- within the image.
