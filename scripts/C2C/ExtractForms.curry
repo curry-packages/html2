@@ -4,10 +4,10 @@
 --- necessary.
 ---
 --- @author Michael Hanus
---- @version February 2025
+--- @version April 2025
 ------------------------------------------------------------------------------
 
-module C2C.ExtractForms ( extractFormsInProg )
+module C2C.ExtractForms ( extractFormsInProg, cleanModule )
  where
 
 import Control.Monad    ( when, unless )
@@ -218,16 +218,21 @@ testFormIDsInProg opts mname formnames = do
   c <- system $ unwords
          [optSystem opts </> "bin" </> "curry",":set v0", ":load", testprogname,
           ":eval", "main", ":quit"]
-  cleanProg testprogname
+  cleanModule opts testprogname
   return $ c == 0
  where
-  cleanProg modname = do
-    system $ unwords [optSystem opts </> "bin" </> "cleancurry", modname]
-    system $ "/bin/rm -f " ++ modname ++ ".curry"
-
   genFormCall qn =
     let s = showQName qn
     in "checkFormID (" ++ s ++ ",\"" ++ s ++ "\")"
+
+-- Clean/remove a module in the current directory.
+cleanModule :: Options -> String -> IO ()
+cleanModule opts modname = do
+  let cleancurry = optSystem opts </> "bin" </> "cleancurry"
+  excc <- doesFileExist cleancurry
+  when excc (system (unwords [cleancurry, modname]) >> return ())
+  system $ "/bin/rm -f " ++ modname ++ ".curry"
+  return ()
 
 checkFormIDDefinition :: Options -> String
 checkFormIDDefinition opts = unlines

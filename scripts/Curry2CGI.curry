@@ -5,7 +5,7 @@
 --- for executing cgi scripts.
 ---
 --- @author Michael Hanus
---- @version February 2025
+--- @version April 2025
 ------------------------------------------------------------------------------
 
 module Curry2CGI ( main )
@@ -29,7 +29,7 @@ import FlatCurry.Files               ( readFlatCurry )
 import FlatCurry.TypeAnnotated.Files ( readTypeAnnotatedFlatCurry )
 
 import C2C.Options
-import C2C.ExtractForms              ( extractFormsInProg )
+import C2C.ExtractForms              ( extractFormsInProg, cleanModule )
 import C2C.TransFlatCurryForms       ( copyTransFlatCurry )
 import C2C.TransTypedFlatCurryForms  ( copyTransTypedFlatCurry )
 
@@ -60,6 +60,7 @@ checkCurrySystem opts = do
     "pakcs"    -> return opts { optTypedFlat = False, optFixForms = True }
     "kics2"    -> return opts { optTypedFlat = True  }
     "curry2go" -> return opts { optTypedFlat = False }
+    "kmcc"     -> return opts { optTypedFlat = False }
     _          -> do putStrLn $ "Unknown Curry system '" ++ sysname ++ "'."
                      exitWith 1
 
@@ -93,14 +94,14 @@ compileCGI opts transmods mname = do
   cf <- system compilecmd
   when (cf > 0) $ do
     putStrLn "Error occurred, generation aborted."
-    cleanMain mainmod
+    cleanModule opts mainmod
     exitWith 1
   -- move compiled executable to final position and generate small shell
   -- script to call the executable with ulimit and correct path:
   system $ unwords ["mv", mainmod, cgifile ++ ".bin"]
   system $ unwords ["chmod", "755", cgifile ++ ".bin"]
   genShellScript opts cgifile
-  cleanMain mainmod
+  cleanModule opts mainmod
   cdate <- getLocalTime >>= return . calendarTimeToString
   writeFile (cgifile ++ ".log") (cdate ++ ": cgi script compiled\n")
   putStrLnInfo opts $
@@ -115,10 +116,6 @@ compileCGI opts transmods mname = do
               mapM_ (copyTransTypedFlatCurry opts) transmods
       else do readFlatCurry mainmod
               mapM_ (copyTransFlatCurry opts) transmods
-
-  cleanMain mainmod = do
-    system $ unwords [optSystem opts </> "bin" </> "cleancurry", mainmod]
-    system $ "/bin/rm -f " ++ mainmod ++ ".curry"
 
 -- Generates the small cgi shell script that actually calls the executable.
 genShellScript :: Options -> String -> IO ()
