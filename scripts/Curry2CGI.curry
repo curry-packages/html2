@@ -5,7 +5,7 @@
 --- for executing cgi scripts.
 ---
 --- @author Michael Hanus
---- @version April 2025
+--- @version August 2025
 ------------------------------------------------------------------------------
 
 module Curry2CGI ( main )
@@ -39,6 +39,14 @@ main :: IO ()
 main = do
   args <- getArgs
   (opts0,prog) <- processOptions args
+  putStrLnDetail opts0 $ unlines
+    [ "Options of Curry2CGI translator:\n"
+    , "Curry Package Manger: " ++ optCPM opts0
+    , "Root of Curry system: " ++ optSystem opts0
+    , "Value of ulimit:      " ++ optLimit opts0
+    , "CGI output file:      " ++ optOutput opts0
+    , "Main expression:      " ++ optMain opts0
+    ]
   opts <- checkCurrySystem opts0
   setCurryPath (optVerb opts < 2) (optCPM opts)
   modformops <- mapM (extractFormsInProg opts) (optFormMods opts)
@@ -46,6 +54,7 @@ main = do
       transmods        = catMaybes mbmods
   compileCGI (opts { optForms = nub (concat formops) }) transmods prog
 
+-- Check the Curry system and set other options according to the system.
 checkCurrySystem :: Options -> IO Options
 checkCurrySystem opts = do
   let currybin = optSystem opts </> "bin" </> "curry"
@@ -54,7 +63,7 @@ checkCurrySystem opts = do
     error $ "Curry system executable '" ++ currybin ++ "' does not exist!"
   (rc,out,_) <- evalCmd currybin ["--compiler-name"] ""
   unless (rc == 0) $
-    error "Cannot determine kind of Curry system (pakcs,kics2,curry2go)!"
+    error "Cannot determine kind of Curry system (pakcs|kics2|curry2go|kmcc)!"
   let sysname = filter (not . isSpace) out
   case sysname of
     "pakcs"    -> return opts { optTypedFlat = False, optFixForms = True }

@@ -2,7 +2,7 @@
 --- Option processing for the `curry2cgi` script.
 ---
 --- @author Michael Hanus
---- @version February 2025
+--- @version August 2025
 ------------------------------------------------------------------------------
 
 module C2C.Options
@@ -25,7 +25,7 @@ banner :: String
 banner = unlines [bannerLine,bannerText,bannerLine]
  where
   bannerText = "Compile Curry programs with HTML forms to CGI executables " ++
-               "(Version of 25/02/25)"
+               "(Version of 05/08/25)"
   bannerLine = take (length bannerText) (repeat '=')
 
 ------------------------------------------------------------------------------
