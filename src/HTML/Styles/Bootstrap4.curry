@@ -153,9 +153,9 @@ data BodyOptions = BodyOptions
   { leftCols   :: Int    -- ^ Number of columns for the left-side menu
                          --   (if columns==0, then the left-side menu is omitted)
   , hideNavbar :: Bool   -- ^ Hide the left side menu on small screens
-  , container  :: String -- ^ Bootstrap container class, e.g., 
+  , container  :: String -- ^ Bootstrap container class, e.g.,
                          --   "container-fluid" or "container"
-  } 
+  }
  deriving (Show, Eq)
 
 --- Creates body of HTML page. Used by `bootstrapPage`.
@@ -167,12 +167,12 @@ bootstrapBody jsincludes brandurltitle lefttopmenu righttopmenu
   topNavigationBar brandurltitle lefttopmenu righttopmenu ++
   [blockstyle (container opts)
      ([blockstyle "row"
-        (if leftCols opts ==0
+        (if leftCols opts == 0
            then [blockstyle (bsCols 12)
                    (headerRow ++ contents)]
-           else [blockstyle (bsCols $ leftCols opts)
+           else [blockstyle (sidebarCols ++ sidebarVisibility)
                    [blockstyle "card" sidemenu],
-                 blockstyle (bsCols (12 - leftCols opts) ++ colLg)
+                 blockstyle (mainCols)
                    (headerRow ++ contents)])] ++
        if null footerdoc
          then []
@@ -180,16 +180,25 @@ bootstrapBody jsincludes brandurltitle lefttopmenu righttopmenu
    -- JavaScript includes placed at the end so page loads faster:
   map (\n -> htmlStruct "script" [("src",n)] []) jsincludes
  where
-  bsCols n = "col-sm-" ++ show n ++ " " ++ "col-md-" ++ show n
-  colLg = if hideNavbar opts
-            then "col-lg-12"
-            else ""
-  
+  -- Sidebar column classes
+  sidebarCols = bsCols (leftCols opts)
+
+  -- Hide sidebar on small screens if hideNavbar is True
+  sidebarVisibility = if hideNavbar opts
+                      then " d-sm-none d-md-block"
+                      else ""
+
+  -- Main content columns - full width on small screens when sidebar is hidden
+  mainCols = if hideNavbar opts
+             then "col-sm-12 " ++ "col-md-" ++ show (12 - leftCols opts)
+             else bsCols (12 - leftCols opts)
+
+  bsCols n = "col-sm-" ++ show n ++ " col-md-" ++ show n
+
   -- header row:
   headerRow = if null header
                 then []
                 else [htmlStruct "header" [("class","jumbotron")] header]
-
 
 -- Navigation bar at the top. The first argument is a header element
 -- put at the left, the second and third arguments are the left
