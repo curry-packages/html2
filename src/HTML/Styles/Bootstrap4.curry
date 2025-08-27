@@ -3,12 +3,12 @@
 --- rendered with [Bootstrap version 4](https://getbootstrap.com/).
 ---
 --- @author Michael Hanus
---- @version January 2024
+--- @version August 2025
 ----------------------------------------------------------------------------
 
 module HTML.Styles.Bootstrap4
- ( bootstrapPage, bootstrapPage2, titledSideMenu
- , primButton, primSmButton, scndButton, scndSmButton
+ ( bootstrapPage, bootstrapPageExtended, bootstrapPage2, BodyOptions(..)
+ , titledSideMenu, primButton, primSmButton, scndButton, scndSmButton
  , infoButton, infoSmButton
  , hrefPrimButton, hrefPrimSmButton, hrefScndButton, hrefScndSmButton
  , hrefInfoButton, hrefInfoSmButton, hrefSuccButton, hrefSuccSmButton
@@ -58,6 +58,36 @@ bootstrapPage favicon styles jsincludes title brandurltitle lefttopmenu
  where
   addNavItemClass = map (\i -> ("nav-item", i))
 
+--- An HTML page rendered with bootstrap with a fixed top navigation bar,
+--- with extended configuration options for the body.
+--- @param favicon   - the icon file `favicon.ico` (when empty not included)
+--- @param styles    - the style files to be included (typically,
+---                    `css/bootstrap.min.css`)
+--- @param jsincludes - the JavaScript files to be included (typically,
+---                     `.../jquery.js`, `js/bootstrap.min.js`)
+--- @param title   - the title of the form
+--- @param brand   - the brand shown top left (a URL/title pair)
+--- @lefttopmenu   - the menu shown in the left side of the top navigation bar
+--- @righttopmenu  - the menu shown in the right side of the top navigation bar
+---                  (could be empty)
+--- @param opts     - configuration options for the body of the page
+--- @param sidemenu - the menu shown at the left-side of the main document
+---                   (maybe created with 'titledSideMenu')
+--- @param header   - the main header (will be rendered with jumbotron style)
+--- @param contents - the main contents of the document
+--- @param footer   - the footer of the document
+bootstrapPageExtended :: String -> [String] -> [String] -> String -> (String,[BaseHtml])
+              -> [[BaseHtml]] -> [[BaseHtml]] -> BodyOptions -> [BaseHtml] -> [BaseHtml]
+              -> [BaseHtml] -> [BaseHtml] -> HtmlPage
+bootstrapPageExtended favicon styles jsincludes title brandurltitle lefttopmenu
+              righttopmenu opts sidemenu header contents footer =
+  bootstrapPageInternal favicon styles jsincludes title brandurltitle
+                        (addNavItemClass lefttopmenu)
+                        (addNavItemClass righttopmenu)
+                        opts sidemenu header contents footer
+ where
+  addNavItemClass = map (\i -> ("nav-item", i))
+
 --- An HTML page rendered with bootstrap with a fixed top navigation bar
 --- and individual classes for the top menu items.
 --- @param favicon   - the icon file `favicon.ico` (when empty not included)
@@ -84,12 +114,29 @@ bootstrapPage2 :: String -> [String] -> [String] -> String
                -> [BaseHtml] -> [BaseHtml] -> HtmlPage
 bootstrapPage2 favicon styles jsincludes title brandurltitle
   lefttopmenu righttopmenu leftcols sidemenu header contents footer =
+  bootstrapPageInternal favicon styles jsincludes title brandurltitle
+                        lefttopmenu righttopmenu opts sidemenu header
+                        contents footer
+ where
+  opts = BodyOptions { leftCols = leftcols, hideNavbar = False
+                     , container = "container-fluid" }
+
+--- An HTML page rendered with bootstrap with a fixed top navigation bar
+--- and individual classes for the top menu items, parametrized by
+--- configuration options for the body.
+bootstrapPageInternal :: String -> [String] -> [String] -> String
+               -> (String,[BaseHtml]) -> [(String,[BaseHtml])]
+               -> [(String,[BaseHtml])] -> BodyOptions -> [BaseHtml] -> [BaseHtml]
+               -> [BaseHtml] -> [BaseHtml] -> HtmlPage
+bootstrapPageInternal favicon styles jsincludes title brandurltitle
+  lefttopmenu righttopmenu opts sidemenu header contents footer =
   HtmlPage title
            ([pageEnc "utf-8", responsiveView] ++ icon ++
              map pageCSS styles)
            (bootstrapBody jsincludes brandurltitle
                           lefttopmenu righttopmenu
-                          leftcols sidemenu header contents footer)
+                          opts
+                          sidemenu header contents footer)
  where
   -- for a better view on handheld devices:
   responsiveView =
@@ -101,21 +148,31 @@ bootstrapPage2 favicon styles jsincludes title brandurltitle
            then []
            else [pageLinkInfo [("rel","shortcut icon"), ("href",favicon)]]
 
---- Create body of HTML page. Used by `bootstrapPage`.
+--- Configuration options for the body of a Bootstrap page.
+data BodyOptions = BodyOptions
+  { leftCols   :: Int    -- ^ Number of columns for the left-side menu
+                         --   (if columns==0, then the left-side menu is omitted)
+  , hideNavbar :: Bool   -- ^ Hide the left side menu on small screens
+  , container  :: String -- ^ Bootstrap container class, e.g.,
+                         --   "container-fluid" or "container"
+  }
+ deriving (Show, Eq)
+
+--- Creates body of HTML page. Used by `bootstrapPage`.
 bootstrapBody ::
   HTML h => [String] -> (String,[h]) -> [(String,[h])] -> [(String,[h])]
-         -> Int -> [h] -> [h] -> [h] -> [h] -> [h]
+         -> BodyOptions -> [h] -> [h] -> [h] -> [h] -> [h]
 bootstrapBody jsincludes brandurltitle lefttopmenu righttopmenu
-              leftcols sidemenu header contents footerdoc =
+              opts sidemenu header contents footerdoc =
   topNavigationBar brandurltitle lefttopmenu righttopmenu ++
-  [blockstyle "container-fluid"
+  [blockstyle (container opts)
      ([blockstyle "row"
-        (if leftcols==0
+        (if leftCols opts == 0
            then [blockstyle (bsCols 12)
                    (headerRow ++ contents)]
-           else [blockstyle (bsCols leftcols)
+           else [blockstyle (sidebarCols ++ sidebarVisibility)
                    [blockstyle "card" sidemenu],
-                 blockstyle (bsCols (12-leftcols))
+                 blockstyle (mainCols)
                    (headerRow ++ contents)])] ++
        if null footerdoc
          then []
@@ -123,13 +180,25 @@ bootstrapBody jsincludes brandurltitle lefttopmenu righttopmenu
    -- JavaScript includes placed at the end so page loads faster:
   map (\n -> htmlStruct "script" [("src",n)] []) jsincludes
  where
-  bsCols n = "col-sm-" ++ show n ++ " " ++ "col-md-" ++ show n
-  
+  -- Sidebar column classes
+  sidebarCols = bsCols (leftCols opts)
+
+  -- Hide sidebar on small screens if hideNavbar is True
+  sidebarVisibility = if hideNavbar opts
+                      then " d-sm-none d-md-block"
+                      else ""
+
+  -- Main content columns - full width on small screens when sidebar is hidden
+  mainCols = if hideNavbar opts
+             then "col-sm-12 " ++ "col-md-" ++ show (12 - leftCols opts)
+             else bsCols (12 - leftCols opts)
+
+  bsCols n = "col-sm-" ++ show n ++ " col-md-" ++ show n
+
   -- header row:
   headerRow = if null header
                 then []
                 else [htmlStruct "header" [("class","jumbotron")] header]
-
 
 -- Navigation bar at the top. The first argument is a header element
 -- put at the left, the second and third arguments are the left
