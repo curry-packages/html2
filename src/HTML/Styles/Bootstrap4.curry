@@ -7,7 +7,7 @@
 ----------------------------------------------------------------------------
 
 module HTML.Styles.Bootstrap4
- ( bootstrapPage, bootstrapPageExtended, bootstrapPage2, BodyOptions(..)
+ ( bootstrapPage, bootstrapPageWithBodyOpts, bootstrapPage2, BodyOptions(..)
  , titledSideMenu, primButton, primSmButton, scndButton, scndSmButton
  , infoButton, infoSmButton
  , hrefPrimButton, hrefPrimSmButton, hrefScndButton, hrefScndSmButton
@@ -37,9 +37,9 @@ import HTML.Base
 ---                     `.../jquery.js`, `js/bootstrap.min.js`)
 --- @param title   - the title of the form
 --- @param brand   - the brand shown top left (a URL/title pair)
---- @lefttopmenu   - the menu shown in the left side of the top navigation bar
---- @righttopmenu  - the menu shown in the right side of the top navigation bar
----                  (could be empty)
+--- @param lefttopmenu  - the menu shown in the left side of the top navigation bar
+--- @param righttopmenu - the menu shown in the right side of the top navigation bar
+---                       (could be empty)
 --- @param columns - number of columns for the left-side menu
 ---                  (if columns==0, then the left-side menu is omitted)
 --- @param sidemenu - the menu shown at the left-side of the main document
@@ -67,24 +67,24 @@ bootstrapPage favicon styles jsincludes title brandurltitle lefttopmenu
 ---                     `.../jquery.js`, `js/bootstrap.min.js`)
 --- @param title   - the title of the form
 --- @param brand   - the brand shown top left (a URL/title pair)
---- @lefttopmenu   - the menu shown in the left side of the top navigation bar
---- @righttopmenu  - the menu shown in the right side of the top navigation bar
----                  (could be empty)
---- @param opts     - configuration options for the body of the page
+--- @param lefttopmenu  - the menu shown in the left side of the top navigation bar
+--- @param righttopmenu - the menu shown in the right side of the top navigation bar
+---                       (could be empty)
+--- @param bodyopts - configuration options for the body of the page
 --- @param sidemenu - the menu shown at the left-side of the main document
 ---                   (maybe created with 'titledSideMenu')
 --- @param header   - the main header (will be rendered with jumbotron style)
 --- @param contents - the main contents of the document
 --- @param footer   - the footer of the document
-bootstrapPageExtended :: String -> [String] -> [String] -> String -> (String,[BaseHtml])
-              -> [[BaseHtml]] -> [[BaseHtml]] -> BodyOptions -> [BaseHtml] -> [BaseHtml]
-              -> [BaseHtml] -> [BaseHtml] -> HtmlPage
-bootstrapPageExtended favicon styles jsincludes title brandurltitle lefttopmenu
-              righttopmenu opts sidemenu header contents footer =
+bootstrapPageWithBodyOpts :: String -> [String] -> [String] -> String
+  -> (String,[BaseHtml]) -> [[BaseHtml]] -> [[BaseHtml]] -> BodyOptions
+  -> [BaseHtml] -> [BaseHtml] -> [BaseHtml] -> [BaseHtml] -> HtmlPage
+bootstrapPageWithBodyOpts favicon styles jsincludes title brandurltitle
+     lefttopmenu righttopmenu bodyopts sidemenu header contents footer =
   bootstrapPageInternal favicon styles jsincludes title brandurltitle
                         (addNavItemClass lefttopmenu)
                         (addNavItemClass righttopmenu)
-                        opts sidemenu header contents footer
+                        bodyopts sidemenu header contents footer
  where
   addNavItemClass = map (\i -> ("nav-item", i))
 
@@ -97,10 +97,10 @@ bootstrapPageExtended favicon styles jsincludes title brandurltitle lefttopmenu
 ---                     `.../jquery.js`, `js/bootstrap.min.js`)
 --- @param title   - the title of the form
 --- @param brand   - the brand shown top left (a URL/title pair)
---- @lefttopmenu   - the menu shown in the left side of the top navigation bar
----                  (with class attribute for the menu items)
---- @righttopmenu  - the menu shown in the right side of the top navigation bar
----                  (with class attribute for the menu items, could be empty)
+--- @param lefttopmenu - the menu shown in the left side of the top navigation bar
+---                      (with class attribute for the menu items)
+--- @param righttopmenu - the menu shown in the right side of the top navigation bar
+---                       (with class attribute for the menu items, could be empty)
 --- @param columns - number of columns for the left-side menu
 ---                  (if columns==0, then the left-side menu is omitted)
 --- @param sidemenu - the menu shown at the left-side of the main document
@@ -115,27 +115,27 @@ bootstrapPage2 :: String -> [String] -> [String] -> String
 bootstrapPage2 favicon styles jsincludes title brandurltitle
   lefttopmenu righttopmenu leftcols sidemenu header contents footer =
   bootstrapPageInternal favicon styles jsincludes title brandurltitle
-                        lefttopmenu righttopmenu opts sidemenu header
+                        lefttopmenu righttopmenu bodyopts sidemenu header
                         contents footer
  where
-  opts = BodyOptions { leftCols = leftcols, hideNavbar = False
-                     , container = "container-fluid" }
+  bodyopts = BodyOptions { leftCols = leftcols, hideNavbar = False
+                         , container = "container-fluid" }
 
 --- An HTML page rendered with bootstrap with a fixed top navigation bar
 --- and individual classes for the top menu items, parametrized by
 --- configuration options for the body.
 bootstrapPageInternal :: String -> [String] -> [String] -> String
-               -> (String,[BaseHtml]) -> [(String,[BaseHtml])]
-               -> [(String,[BaseHtml])] -> BodyOptions -> [BaseHtml] -> [BaseHtml]
-               -> [BaseHtml] -> [BaseHtml] -> HtmlPage
+             -> (String,[BaseHtml]) -> [(String,[BaseHtml])]
+             -> [(String,[BaseHtml])] -> BodyOptions -> [BaseHtml] -> [BaseHtml]
+             -> [BaseHtml] -> [BaseHtml] -> HtmlPage
 bootstrapPageInternal favicon styles jsincludes title brandurltitle
-  lefttopmenu righttopmenu opts sidemenu header contents footer =
+  lefttopmenu righttopmenu bodyopts sidemenu header contents footer =
   HtmlPage title
            ([pageEnc "utf-8", responsiveView] ++ icon ++
              map pageCSS styles)
            (bootstrapBody jsincludes brandurltitle
                           lefttopmenu righttopmenu
-                          opts
+                          bodyopts
                           sidemenu header contents footer)
  where
   -- for a better view on handheld devices:
@@ -163,11 +163,11 @@ bootstrapBody ::
   HTML h => [String] -> (String,[h]) -> [(String,[h])] -> [(String,[h])]
          -> BodyOptions -> [h] -> [h] -> [h] -> [h] -> [h]
 bootstrapBody jsincludes brandurltitle lefttopmenu righttopmenu
-              opts sidemenu header contents footerdoc =
+              bodyopts sidemenu header contents footerdoc =
   topNavigationBar brandurltitle lefttopmenu righttopmenu ++
-  [blockstyle (container opts)
+  [blockstyle (container bodyopts)
      ([blockstyle "row"
-        (if leftCols opts == 0
+        (if leftCols bodyopts == 0
            then [blockstyle (bsCols 12)
                    (headerRow ++ contents)]
            else [blockstyle (sidebarCols ++ sidebarVisibility)
@@ -181,17 +181,17 @@ bootstrapBody jsincludes brandurltitle lefttopmenu righttopmenu
   map (\n -> htmlStruct "script" [("src",n)] []) jsincludes
  where
   -- Sidebar column classes
-  sidebarCols = bsCols (leftCols opts)
+  sidebarCols = bsCols (leftCols bodyopts)
 
   -- Hide sidebar on small screens if hideNavbar is True
-  sidebarVisibility = if hideNavbar opts
+  sidebarVisibility = if hideNavbar bodyopts
                       then " d-sm-none d-md-block"
                       else ""
 
   -- Main content columns - full width on small screens when sidebar is hidden
-  mainCols = if hideNavbar opts
-             then "col-sm-12 " ++ "col-md-" ++ show (12 - leftCols opts)
-             else bsCols (12 - leftCols opts)
+  mainCols = if hideNavbar bodyopts
+             then "col-sm-12 " ++ "col-md-" ++ show (12 - leftCols bodyopts)
+             else bsCols (12 - leftCols bodyopts)
 
   bsCols n = "col-sm-" ++ show n ++ " col-md-" ++ show n
 
