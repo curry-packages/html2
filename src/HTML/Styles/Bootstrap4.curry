@@ -185,7 +185,7 @@ bootstrapBody jsincludes brandurltitle lefttopmenu righttopmenu
 
   -- Hide sidebar on small screens if hideNavbar is True
   sidebarVisibility = if hideNavbar bodyopts
-                      then " d-sm-none d-md-block"
+                      then " d-none d-md-block"
                       else ""
 
   -- Main content columns - full width on small screens when sidebar is hidden
