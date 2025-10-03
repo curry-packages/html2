@@ -426,38 +426,39 @@ instHtmlRefs (HtmlAction _ : _) _ =
 --- The data type for representing HTML pages. Since the HTML document
 --- shown in this page is a base HTML expression, it is ensured that
 --- input elements and event handlers occur only in embedded forms.
---- @cons HtmlPage t ps hs - an HTML page with title t, optional parameters
----                          (e.g., cookies) ps, and contents hs
---- @cons HtmlAnswer t c - an answer in an arbitrary format where t
----         is the content type (e.g., "text/plain") and c is the contents
-data HtmlPage = HtmlPage String [PageParam] [BaseHtml]
-              | HtmlAnswer String String
+data HtmlPage =
+    HtmlPage String [PageParam] [BaseHtml]
+    -- ^ An HTML page with title, optional parameters (e.g., cookies),
+    --   and contents hs
+  | HtmlAnswer String String
+    -- ^ An answer in an arbitrary format where the first component is the
+    --   content type (e.g., "text/plain") and the second is the contents
 
 --- The possible parameters of an HTML page.
 --- The parameters of a cookie (`PageCookie`) are its name and value and
 --- optional parameters (expiration date, domain, path (e.g., the path "/"
 --- makes the cookie valid for all documents on the server), security) which
 --- are collected in a list.
---- @cons PageEnc - the encoding scheme of this page
---- @cons PageCookie name value params - a cookie to be sent to the
----                                      client's browser
---- @cons PageCSS s - a URL for a CSS file for this page
---- @cons HttpHeader key value - additional HTTP header included in this page
---- @cons PageJScript s - a URL for a Javascript file for this page
---- @cons PageMeta as - meta information (in form of attributes) for this page
---- @cons PageLink as - link information (in form of attributes) for this page
---- @cons PageHeadInclude he - HTML expression to be included in page header
---- @cons PageBodyAttr attr - optional attribute for the body element of the
----                           page (more than one occurrence is allowed)
-data PageParam = PageEnc         String
-               | PageCookie      String String [CookieParam]
-               | PageCSS         String
-               | HttpHeader      String String
-               | PageJScript     String
-               | PageMeta        [(String,String)]
-               | PageLink        [(String,String)]
-               | PageHeadInclude BaseHtml
-               | PageBodyAttr    (String,String)
+data PageParam =
+    PageEnc         String
+    -- ^ the encoding scheme of this page
+  | PageCookie      String String [CookieParam]
+    -- ^ a cookie with name and value to be sent to the client's browser
+  | PageCSS         String
+    -- ^ a URL for a CSS file for this page
+  | HttpHeader      String String
+    -- ^ additional HTTP (key/value) header included in this page
+  | PageJScript     String
+    -- ^ a URL for a Javascript file for this page
+  | PageMeta        [(String,String)]
+    -- ^ meta information (in form of attributes) for this page
+  | PageLink        [(String,String)]
+    -- ^ link information (in form of attributes) for this page
+  | PageHeadInclude BaseHtml
+    -- ^ HTML expression to be included in page header
+  | PageBodyAttr    (String,String)
+    -- ^ optional attribute for the body element of the
+    --   page (more than one occurrence is allowed)
 
 --- An encoding scheme for a HTML page.
 pageEnc :: String -> PageParam
