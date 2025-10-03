@@ -116,16 +116,16 @@ hStruct tag = htmlStruct tag []
 
 ------------------------------------------------------------------------------
 --- The data type to represent static HTML expressions in web scripts.
---- @cons BaseText s         - a text string without any further structure
---- @cons BaseStruct t as hs - a structure with a tag, attributes, and
----                             HTML expressions inside the structure
---- @cons BaseAction act     - an action that computes a general HTML expression
----                            which will be inserted when the HTML document
----                            is shown (used to implement form expressions)
 data BaseHtml =
     BaseText   String
+    -- ^ a text string without any further structure
   | BaseStruct String Attrs [BaseHtml]
+    -- ^ a structure with a tag, attributes, and HTML expressions
+    --   inside the structure
   | BaseAction (IO HtmlExp)
+    -- ^ an action that computes a general HTML expression
+    --   which will be inserted when the HTML document
+    --   is shown (used to implement form expressions)
 
 --- Updates the attributes in a basic HTML expression.
 updBaseAttrs :: (Attrs -> Attrs) -> BaseHtml -> BaseHtml
@@ -153,12 +153,12 @@ instance HTML BaseHtml where
 --- It is similar to type `BaseHtml` except that there
 --- is no constructor `BaseAction` so this type has instances
 --- for standard classes like `Eq`, `Data`, `Read`, and `Show`.
---- @cons HText s         - a text string without any further structure
---- @cons HStruct t as hs - a structure with a tag, attributes, and
----                         HTML expressions inside the structure
 data StaticHtml =
     HText   String
+    -- ^ a text string without any further structure
   | HStruct String Attrs [StaticHtml]
+    -- ^ a structure with a tag, attributes, and
+    --   HTML expressions inside the structure
  deriving (Eq, Read, Show)
 
 --- The type of static HTML expressions is an instance of class `HTML`.
@@ -214,23 +214,23 @@ type HtmlHandler = HtmlEnv -> IO HtmlPage
 ------------------------------------------------------------------------------
 --- The data type for representing HTML expressions with input elements,
 --- i.e., all elements which might occur inside a form.
---- @cons HtmlText s           - a text string without any further structure
---- @cons HtmlStruct t as hs   - a structure with a tag, attributes, and
----                              HTML expressions inside the structure
---- @cons HtmlInput ref h      - an input element (described by the second
----                              argument) with a cgi reference
---- @cons HtmlEvent h ref hdlr - an input element (first arg) identified
----                              by a cgi reference with an associated
----                              event handler (typically, a submit button)
---- @cons HtmlAction act       - an action that computes an HTML expression
----                              which will be inserted when the HTML document
----                              is shown (used to implement form expressions)
 data HtmlExp =
     HtmlText   String
+    -- ^ a text string without any further structure
   | HtmlStruct String Attrs [HtmlExp]
+    -- ^ a structure with a tag, attributes, and
+    --   HTML expressions inside the structure
   | HtmlAction (IO HtmlExp)
+    -- ^ an action that computes an HTML expression
+    --   which will be inserted when the HTML document
+    --   is shown (used to implement form expressions)
   | HtmlInput  HtmlRef HtmlExp
+    -- ^ an input element (described by the second argument)
+    --   with a CGI reference
   | HtmlEvent  HtmlRef HtmlHandler HtmlExp
+    -- ^ an input element (first arg) identified
+    --   by a CGI reference with an associated
+    --   event handler (typically, a submit button)
 
 --- Updates the attributes in an HTML expression.
 updHtmlAttrs :: (Attrs -> Attrs) -> HtmlExp -> HtmlExp
