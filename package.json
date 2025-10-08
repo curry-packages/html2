@@ -1,6 +1,6 @@
 {
     "name": "html2",
-    "version": "3.5.2",
+    "version": "3.6.0",
     "author": "Michael Hanus <mh@informatik.uni-kiel.de>",
     "synopsis": "Libraries for HTML programming with event-handler-based form processing",
     "category": [ "Web" ],
