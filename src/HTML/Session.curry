@@ -10,11 +10,13 @@
 -- to hold some session-specific data.
 ------------------------------------------------------------------------------
 
-module HTML.Session
-  ( sessionCookie, doesSessionExist, withSessionCookie, withSessionCookieInfo
-  , SessionStore, sessionStore
-  , getSessionMaybeData, getSessionData
-  , putSessionData, removeSessionData, modifySessionData
+module HTML.Session (
+  -- * Cookies to support sessions
+  sessionCookie, doesSessionExist, withSessionCookie, withSessionCookieInfo,
+  -- * Session data handling
+  SessionStore, sessionStore,
+  getSessionMaybeData, getSessionData,
+  putSessionData, removeSessionData, modifySessionData
   ) where
 
 import Control.Monad      ( unless, when )
@@ -34,25 +36,6 @@ import Data.Time          (ClockTime, addMinutes, clockTimeToInt, getClockTime )
 import Crypto.Hash        ( randomString )
 import Data.Global
 import HTML.Base
-
-------------------------------------------------------------------------------
--- | The name of the local directory where the session data,
---   e.g., cookie information, is stored.
---   For security reasons, the directory should be non-public readable.
-sessionDataDir :: String
-sessionDataDir = "sessiondata"
-
--- | Prefix a file name with the directory where session data,
---   e.g., cookie information, is stored.
-inSessionDataDir :: String -> String
-inSessionDataDir filename = sessionDataDir </> filename
-
--- | Ensures that the `sessionDataDir` directory exists.
---   If it does not exist, it will be created.
-ensureSessionDataDir :: IO ()
-ensureSessionDataDir = do
-  exsdd <- doesDirectoryExist sessionDataDir
-  unless exsdd $ createDirectory sessionDataDir
 
 ------------------------------------------------------------------------------
 -- | The life span in minutes to store data in sessions.
@@ -136,13 +119,13 @@ getScriptDirPath = do
     then return ""
     else return $ "/" ++ intercalate "/" (init scriptpath)
 
--- | Decorates an HTML page with session cookie.
+-- | Decorates an HTML page with a session cookie.
 withSessionCookie :: HtmlPage -> IO HtmlPage
 withSessionCookie p = do
   cookie <- sessionCookie
   return $ (p `addPageParam` cookie)
 
--- | Decorates an HTML page with session cookie and shows an information
+-- | Decorates an HTML page with a session cookie and shows an information
 --   page when the session cookie is not set.
 withSessionCookieInfo :: HtmlPage -> IO HtmlPage
 withSessionCookieInfo p = do
@@ -172,6 +155,24 @@ data SessionStore _ = SessionStore String
 --   file name in the directory containing all session data.
 sessionStore :: (Read a, Show a) => String -> SessionStore a
 sessionStore name = SessionStore name
+
+-- | The name of the local directory where the session data,
+--   e.g., cookie information, is stored.
+--   For security reasons, the directory should be non-public readable.
+sessionDataDir :: String
+sessionDataDir = "sessiondata"
+
+-- | Prefix a file name with the directory where session data,
+--   e.g., cookie information, is stored.
+inSessionDataDir :: String -> String
+inSessionDataDir filename = sessionDataDir </> filename
+
+-- | Ensures that the `sessionDataDir` directory exists.
+--   If it does not exist, it will be created.
+ensureSessionDataDir :: IO ()
+ensureSessionDataDir = do
+  exsdd <- doesDirectoryExist sessionDataDir
+  unless exsdd $ createDirectory sessionDataDir
 
 -- | Ensures that the directory for the SessionStore exists.
 --   If it does not exist, it will be created.
