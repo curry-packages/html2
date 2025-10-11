@@ -16,7 +16,7 @@ module HTML.Session (
   -- * Session data handling
   SessionStore, sessionStore,
   getSessionMaybeData, getSessionData,
-  putSessionData, removeSessionData, modifySessionData
+  putSessionData, modifySessionData, removeSessionData
   ) where
 
 import Control.Monad      ( unless, when )
@@ -267,8 +267,9 @@ cleanUpSessionStore sstore@(SessionStore sname) = do
   curtime <- getClockTime
   mapM_ (deleteIfOld curtime) (map (sdir </>) sdfiles)
  where
-  deleteIfOld curtime fn = do
-    ftime <- getModificationTime fn
-    when (addMinutes sessionLifespan ftime < curtime) $ removeFile fn
+  deleteIfOld curtime fn =
+    catch (do ftime <- getModificationTime fn
+              when (addMinutes sessionLifespan ftime < curtime) $ removeFile fn)
+          (\_ -> return ())
 
 ------------------------------------------------------------------------------
