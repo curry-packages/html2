@@ -11,9 +11,7 @@
 ------------------------------------------------------------------------------
 
 module HTML.Session (
-  -- * Cookies to support sessions
   sessionCookie, doesSessionExist, withSessionCookie, withSessionCookieInfo,
-  -- * Session data handling
   SessionStore, sessionStore,
   getSessionMaybeData, getSessionData,
   putSessionData, modifySessionData, removeSessionData
@@ -208,7 +206,7 @@ readSessionDataFile sstore sid = exclusiveIO (f ++ ".LOCK") $ do
  where
   f = sessionDataFile sstore sid
 
---- Writes data to a session data file.
+-- Writes data to a session data file.
 writeSessionDataFile :: Show a => SessionStore a -> SessionId -> a -> IO ()
 writeSessionDataFile sstore sid v = do
   let sdfile = sessionDataFile sstore sid
