@@ -1,8 +1,8 @@
 ------------------------------------------------------------------------------
---- This module contains a very simple parser for HTML documents.
----
---- @author Michael Hanus
---- @version October 2022
+-- | This module contains a very simple parser for HTML documents.
+--
+--   Author:  Michael Hanus
+--   Version: October 2022
 ------------------------------------------------------------------------------
 
 module HTML.Parser ( readHtmlFile, parseHtmlString )
@@ -12,28 +12,29 @@ import Data.Char
 import HTML.Base
 
 ------------------------------------------------------------------------------
---- Reads a file with HTML text and returns the corresponding HTML expressions.
---- @param file - the name of a file containing HTML text
---- @return a list of HTML expressions (if the file contains exactly one
----         HTML document, this list should contain exactly one element)
-readHtmlFile :: HTML h => String -> IO [h]
+-- | Reads a file with HTML text and returns the corresponding HTML expressions.
+readHtmlFile :: HTML h
+             => String -- ^ the name of a file containing HTML text
+             -> IO [h] -- ^ a list of HTML expressions (if the file contains
+                       --   exactly one HTML document, this list contains
+                       --   exactly one element)
 readHtmlFile file = readFile file >>= return . parseHtmlString
 
---- Transforms an HTML string into a list of `BaseHTML` expressions.
---- If the HTML string is a well structured document, the list
---- of HTML expressions should contain exactly one element.
+-- | Transforms an HTML string into a list of `BaseHTML` expressions.
+--   If the HTML string is a well structured document, the list
+--   of HTML expressions should contain exactly one element.
 parseHtmlString :: HTML h => String -> [h]
 parseHtmlString = map fromStaticHtml . parseHtml
 
---- Transforms an HTML string into a list of `StaticHtml` expressions.
---- If the HTML string is a well structured document, the list
---- of HTML expressions should contain exactly one element.
+-- Transforms an HTML string into a list of `StaticHtml` expressions.
+-- If the HTML string is a well structured document, the list
+-- of HTML expressions should contain exactly one element.
 parseHtml :: String -> [StaticHtml]
 parseHtml s = reverse (parseHtmlTokens [] (scanHtmlString s))
 
 ------------------------------------------------------------------------------
 
---- The data type for representing HTML tokens.
+-- The data type for representing HTML tokens.
 data HtmlToken = HTText String | HTElem String [(String,String)]
 
 -- parse a list of HTML tokens into list of HTML expressions:

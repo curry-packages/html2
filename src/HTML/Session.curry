@@ -1,18 +1,21 @@
 ------------------------------------------------------------------------------
--- | Author:  Michael Hanus
---   Version: October 2025
+-- | This module implements the management of sessions.
+--   In particular, it defines a cookie that must be sent to the client
+--   in order to enable the handling of sessions.
+--   Based on sessions, this module also defines a session store
+--   that can be used by various parts of the application in order
+--   to hold some session-specific data.
 --
--- This module implements the management of sessions.
--- In particular, it defines a cookie that must be sent to the client
--- in order to enable the handling of sessions.
--- Based on sessions, this module also defines a session store
--- that can be used by various parts of the application in order
--- to hold some session-specific data.
+--   Author:  Michael Hanus
+--   Version: October 2025
 ------------------------------------------------------------------------------
 
 module HTML.Session (
+  -- * Cookies for session management
   sessionCookie, doesSessionExist, withSessionCookie, withSessionCookieInfo,
+  -- * Session stores
   SessionStore, sessionStore,
+  -- * Operations to access and change session data
   getSessionMaybeData, getSessionData,
   putSessionData, modifySessionData, removeSessionData
   ) where
@@ -24,15 +27,15 @@ import System.Environment ( getEnv )
 import System.IO          ( IOMode(..), hGetContents, hPutStrLn, openFile
                           , stderr )
 
-import System.Directory   ( createDirectory, doesDirectoryExist, doesFileExist
-                          , getDirectoryContents, getModificationTime
-                          , removeFile )
-import System.FilePath    ( (</>) )
-import System.IOExts      ( exclusiveIO )
-import Data.Time          (ClockTime, addMinutes, clockTimeToInt, getClockTime )
-
-import Crypto.Hash        ( randomString )
+import Crypto.Hash       ( randomString )
 import Data.Global
+import Data.Time         ( ClockTime, addMinutes, clockTimeToInt, getClockTime )
+import System.Directory  ( createDirectory, doesDirectoryExist, doesFileExist
+                         , getDirectoryContents, getModificationTime
+                         , removeFile )
+import System.FilePath   ( (</>) )
+import System.IOExts     ( exclusiveIO )
+
 import HTML.Base
 
 ------------------------------------------------------------------------------

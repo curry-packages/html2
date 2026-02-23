@@ -1,6 +1,6 @@
 ------------------------------------------------------------------------------
---- This library provides functions to categorize a list of entities
---- into a HTML page with an index access (e.g., "A-Z") to these entities.
+-- | This library provides functions to categorize a list of entities
+--   into a HTML page with an index access (e.g., "A-Z") to these entities.
 ------------------------------------------------------------------------------
 
 module HTML.CategorizedList
@@ -13,19 +13,19 @@ import Data.List
 import HTML.Base
 import Network.URL ( string2urlencoded )
 
---- General categorization of a list of entries.
----
---- The item will occur in every category for which the boolean function
---- categoryFun yields True.
---- @param itemL the list of key-item pairs which are supposed to be
---- categorized with respect to key
---- @param categoryL list of key-category pairs to which the items can be
---- sorted in
---- @param categoryFun uses the keys of the items and the keys of the
---- categories to distribute the items among the categories.
---- @return Html containing inner links between the categories
-list2CategorizedHtml ::
-  (HTML h, Show b) => [(a,[h])] -> [(b,String)] -> (a -> b -> Bool) -> [h]
+-- | General categorization of a list of entries.
+--
+-- The item will occur in every category for which the boolean function
+-- categoryFun yields True.
+list2CategorizedHtml :: (HTML h, Show b) =>
+     [(a,[h])]        -- ^ the list of key-item pairs which are supposed to be
+                      --   categorized with respect to key
+  -> [(b,String)]     -- ^ list of key-category pairs to which the items can be
+                      --   sorted in
+  -> (a -> b -> Bool) -- ^ uses the keys of the items and the keys of the
+                      --   categories to distribute the items among
+                      --   the categories
+  -> [h]              -- ^ HTML containing inner links between the categories
 list2CategorizedHtml itemL categoryL categoryFun =
    categories2LinkList categoryL :
    map (\ (categoryKey,categoryString) ->
@@ -49,21 +49,21 @@ categories2LinkList categoryL =
                            [htxt categoryString], nbsp])
                categoryL)]
 
---- Categorize a list of entries with respect to the inial keys.
----
---- The categories are named as all initial characters of the keys of the items.
---- @param itemL  the list of key-item pairs which are supposed to be
---- categorized with respect to key
---- @return Html containing inner links between the categories
-categorizeByItemKey :: HTML h => [(String,[h])] -> [h]
+-- | Categorizes a list of entries with respect to the initial keys.
+--
+-- The categories are named as all initial characters of the keys of the items.
+categorizeByItemKey :: HTML h =>
+     [(String,[h])] -- ^ the list of key-item pairs which are supposed to be
+                    --   categorized with respect to key
+  -> [h]            -- ^ HTML containing inner links between the categories
 categorizeByItemKey itemL =
    list2CategorizedHtml
        itemL 
        (map (\c -> (toUpper c,[toUpper c])) (listHeads (map fst itemL)))
        categorizeStringHead
 
---- Convert a string list into an key-item list
---- The strings are used as keys and for the simple text layout.
+-- | Converts a string list into an key-item list.
+--   The strings are used as keys and for the simple text layout.
 stringList2ItemList :: HTML h => [String] -> [(String,[h])]
 stringList2ItemList = map (\str -> (str,[htxt str]))
 

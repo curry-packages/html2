@@ -1,9 +1,9 @@
 ------------------------------------------------------------------------------
---- This library contains operation to transform HTML documents
---- into LaTeX string.
+-- | This library contains operation to transform HTML documents
+--   into LaTeX string.
 ---
---- @author Michael Hanus
---- @version October 2020
+--   Author:  Michael Hanus
+--   Version: October 2020
 ------------------------------------------------------------------------------
 
 module HTML.LaTeX
@@ -16,12 +16,11 @@ import Data.List ( intercalate )
 
 import HTML.Base
 
---- Transforms HTML expressions into LaTeX string representation.
-
+-- | Transforms HTML expressions into LaTeX string representation.
 showLatexExps :: [BaseHtml] -> String
 showLatexExps hexps = concat (map showLatexExp hexps)
 
---- Transforms an HTML expression into LaTeX string representation.
+-- | Transforms an HTML expression into LaTeX string representation.
 showLatexExp :: BaseHtml -> String
 showLatexExp (BaseText s) = "{" ++ specialchars2tex s ++ "}"
 showLatexExp (BaseStruct tag attrs htmlexp)
@@ -149,7 +148,7 @@ findHtmlAttr atag ((t,f):attrs) =
              else findHtmlAttr atag attrs
 
 
---- Convert special characters into TeX representation, if necessary.
+-- | Convert special characters into TeX representation, if necessary.
 specialchars2tex :: String -> String
 specialchars2tex = htmlSpecialChars2tex . escapeLaTeXSpecials
 
@@ -169,8 +168,8 @@ escapeLaTeXSpecials (c:cs)
   | c=='}'      = "\\}" ++ escapeLaTeXSpecials cs
   | otherwise   = c : escapeLaTeXSpecials cs
 
---- Convert special HTML characters into their LaTeX representation,
---- if necessary.
+-- | Convert special HTML characters into their LaTeX representation,
+--  if necessary.
 htmlSpecialChars2tex :: String -> String
 htmlSpecialChars2tex [] = []
 htmlSpecialChars2tex (c:cs)
@@ -244,35 +243,31 @@ htmlspecial2tex special
   | otherwise = "\\&"++special++";"
 
 ------------------------------------------------------------------------------
---- Transforms HTML expressions into a string representation of a complete
---- LaTeX document.
-
+-- | Transforms HTML expressions into a string representation of a complete
+--   LaTeX document.
 showLatexDoc :: [BaseHtml] -> String
 showLatexDoc htmlexps = showLatexDocs [htmlexps]
 
---- Transforms HTML expressions into a string representation of a complete
---- LaTeX document.
---- The variable "packages" holds the packages to add to the latex document
---- e.g. "ngerman"
-
+-- | Transforms HTML expressions into a string representation of a complete
+--   LaTeX document.
+--   The variable "packages" holds the packages to add to the latex document
+--   e.g. "ngerman"
 showLatexDocWithPackages :: [BaseHtml] -> [String] -> String
 showLatexDocWithPackages hexps packages
   = showLatexDocsWithPackages [hexps] packages
 
---- Transforms a list of HTML expressions into a string representation
---- of a complete LaTeX document where each list entry appears
---- on a separate page.
-
+-- | Transforms a list of HTML expressions into a string representation
+--   of a complete LaTeX document where each list entry appears
+--   on a separate page.
 showLatexDocs :: [[BaseHtml]] -> String
 showLatexDocs htmlexps_list = showLatexDocsWithPackages htmlexps_list []
 
 
---- Transforms a list of HTML expressions into a string representation
---- of a complete LaTeX document where each list entry appears
---- on a separate page.
---- The variable "packages" holds the packages to add to the latex document
---- (e.g., "ngerman").
-
+-- | Transforms a list of HTML expressions into a string representation
+--   of a complete LaTeX document where each list entry appears
+--   on a separate page.
+--   The variable "packages" holds the packages to add to the latex document
+--   (e.g., "ngerman").
 showLatexDocsWithPackages :: [[BaseHtml]] -> [String] -> String
 showLatexDocsWithPackages htmlexps_list packages =
  "\\documentclass[12pt]{article}\n"++
@@ -295,7 +290,7 @@ showLatexDocsWithPackages htmlexps_list packages =
  intercalate "\\newpage\n" (map showLatexExps htmlexps_list) ++
  "\\end{document}\n"
 
---- show german latex document
+-- | Shows german latex document
 germanLatexDoc :: [BaseHtml] -> String
 germanLatexDoc hexps = showLatexDocWithPackages hexps ["ngerman"]
 
